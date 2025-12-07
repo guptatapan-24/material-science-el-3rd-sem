@@ -1,0 +1,7 @@
+{
+  "name": "battery-rul-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "echo 'Streamlit app runs on port 8501' && sleep infinity"
+  }
+}

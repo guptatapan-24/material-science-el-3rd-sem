@@ -393,6 +393,12 @@ def train_models_page():
     st.title("🧠 Model Training & Comparison")
     st.markdown("Compare performance of different ML models for RUL prediction.")
     
+    # Dataset info
+    if 'df' in st.session_state:
+        df = st.session_state.df
+        battery_ids = df['battery_id'].unique() if 'battery_id' in df.columns else []
+        st.info(f"📊 **Dataset**: NASA Battery Dataset | **Samples**: {len(df)} | **Batteries**: {len(battery_ids)} ({', '.join(sorted(battery_ids)[:5])}{'...' if len(battery_ids) > 5 else ''})")
+    
     # Display current metrics
     if st.session_state.models_trained:
         st.markdown("### 📊 Current Model Performance")

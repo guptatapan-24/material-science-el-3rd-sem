@@ -449,59 +449,110 @@ def prepare_training_data(df):
 
 
 def create_user_input_features(voltage, current, temperature, cycle_count, capacity=None):
-    """Create feature vector from user inputs matching training features."""
-    initial_capacity = 2.0  # Typical initial capacity
-    current_capacity = capacity if capacity else 1.8
+    """Create feature vector from user inputs matching training features.
+    
+    This function creates features that align with the NASA battery dataset characteristics.
+    The NASA dataset shows batteries degrade from ~2.0Ah to ~1.2Ah over ~50-170 cycles.
+    """
+    # Use provided capacity or estimate based on cycle (NASA data shows degradation pattern)
+    initial_capacity = 2.0  # Typical initial capacity for NASA dataset batteries
+    
+    if capacity is not None:
+        current_capacity = capacity
+    else:
+        # Estimate capacity based on cycle if not provided
+        # Approximate degradation: ~0.002 Ah per cycle for NASA batteries
+        current_capacity = max(1.2, initial_capacity - (cycle_count * 0.004))
+    
+    # Calculate capacity metrics
+    capacity_fade = initial_capacity - current_capacity
+    capacity_ratio = current_capacity / initial_capacity
+    
+    # Estimate impedance based on cycle and degradation (from NASA data patterns)
+    # Re and Rct increase with aging
+    re_base = 0.055  # Base internal resistance
+    rct_base = 0.18  # Base charge transfer resistance
+    Re = re_base + (cycle_count * 0.00015) + (capacity_fade * 0.01)
+    Rct = rct_base + (cycle_count * 0.0003) + (capacity_fade * 0.02)
+    
+    # Calculate derived voltage features (based on NASA discharge curves)
+    voltage_range = 1.7  # Typical range from 4.2V to 2.5V
+    voltage_min = max(2.5, voltage - (voltage_range / 2))
+    voltage_max = min(4.2, voltage + (voltage_range / 2))
+    
+    # Voltage slope becomes more negative with aging
+    voltage_slope = -0.0008 - (cycle_count * 0.000002)
+    
+    # Voltage skew and kurtosis change with battery health
+    voltage_skew = -0.1 - (capacity_fade * 0.2)
+    voltage_kurtosis = 0.2 + (capacity_fade * 0.3)
+    
+    # Current features (discharge current, typically negative)
+    current_abs = abs(current)
+    
+    # Temperature features (temperature rise during discharge)
+    temp_rise = 3 + (current_abs * 2)  # Higher current = more heat
+    temp_min = temperature - 2
+    temp_max = temperature + temp_rise
+    temp_range = temp_max - temp_min
+    
+    # Power and energy calculations
+    power_mean = voltage * current_abs
+    power_max = voltage_max * current_abs * 1.1
+    
+    # Discharge time inversely related to capacity fade
+    discharge_time = 3000 * capacity_ratio  # Shorter discharge as capacity fades
+    energy = power_mean * discharge_time / 3600  # Wh
     
     feat = {
         # Cycle information
         'cycle': cycle_count,
-        'cycle_normalized': min(cycle_count / 200, 1.0),
+        'cycle_normalized': min(cycle_count / 168.0, 1.0),  # Normalized to max cycles in NASA data
         
-        # Capacity features
+        # Capacity features (most important for RUL prediction)
         'capacity': current_capacity,
         'initial_capacity': initial_capacity,
-        'capacity_fade': initial_capacity - current_capacity,
-        'capacity_ratio': current_capacity / initial_capacity,
-        'soh': (current_capacity / initial_capacity) * 100,
+        'capacity_fade': capacity_fade,
+        'capacity_ratio': capacity_ratio,
+        'soh': capacity_ratio * 100,  # State of Health percentage
         
         # Environmental
         'ambient_temperature': temperature,
         
-        # Impedance (estimated based on cycle)
-        'Re': 0.05 + cycle_count * 0.0001,
-        'Rct': 0.15 + cycle_count * 0.0002,
+        # Impedance (important degradation indicators)
+        'Re': Re,
+        'Rct': Rct,
         
         # Voltage features
         'voltage_mean': voltage,
-        'voltage_std': 0.3,
-        'voltage_min': voltage - 0.5,
-        'voltage_max': voltage + 0.5,
-        'voltage_range': 1.0,
-        'voltage_skew': 0,
-        'voltage_kurtosis': 0,
-        'voltage_slope': -0.001,
+        'voltage_std': 0.35 + (capacity_fade * 0.1),  # More variation with age
+        'voltage_min': voltage_min,
+        'voltage_max': voltage_max,
+        'voltage_range': voltage_range,
+        'voltage_skew': voltage_skew,
+        'voltage_kurtosis': voltage_kurtosis,
+        'voltage_slope': voltage_slope,
         
         # Current features
-        'current_mean': current,
-        'current_std': 0.05,
-        'current_min': current - 0.1 if current < 0 else current,
-        'current_max': current + 0.1 if current > 0 else 0,
-        'current_range': abs(current) + 0.1,
+        'current_mean': current,  # Keep sign for direction
+        'current_std': 0.05 + (abs(current) * 0.02),
+        'current_min': current if current < 0 else current - 0.1,
+        'current_max': 0 if current < 0 else current,
+        'current_range': current_abs + 0.1,
         
         # Temperature features
-        'temp_mean': temperature,
-        'temp_std': 2.0,
-        'temp_min': temperature - 5,
-        'temp_max': temperature + 5,
-        'temp_range': 10,
-        'temp_rise': 5,
+        'temp_mean': temperature + (temp_rise / 2),
+        'temp_std': 1.5 + (temp_rise * 0.2),
+        'temp_min': temp_min,
+        'temp_max': temp_max,
+        'temp_range': temp_range,
+        'temp_rise': temp_rise,
         
         # Time and power
-        'discharge_time': 3000,
-        'power_mean': voltage * abs(current),
-        'power_max': voltage * abs(current) * 1.2,
-        'energy': voltage * abs(current) * 3000,
+        'discharge_time': discharge_time,
+        'power_mean': power_mean,
+        'power_max': power_max,
+        'energy': energy,
     }
     
     return pd.DataFrame([feat])

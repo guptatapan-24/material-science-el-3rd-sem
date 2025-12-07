@@ -217,23 +217,32 @@ def predict_rul_page():
     st.title("📈 Battery RUL Prediction")
     st.markdown("Input battery parameters or upload data to predict remaining useful life.")
     
+    # Show model information
+    if st.session_state.models_trained and 'metrics' in st.session_state:
+        with st.expander("📊 Current Model Performance (R² Scores)", expanded=False):
+            col1, col2, col3, col4 = st.columns(4)
+            for i, (model_name, metrics) in enumerate(st.session_state.metrics.items()):
+                with [col1, col2, col3, col4][i % 4]:
+                    st.metric(model_name, f"R² = {metrics['R2']:.3f}")
+    
     # Input method selection
     input_method = st.radio("📥 Input Method", ["Manual Input", "Upload CSV"], horizontal=True)
     
     if input_method == "Manual Input":
         st.markdown("### ⚙️ Battery Parameters")
+        st.info("💡 Based on NASA Li-ion Battery Dataset: Batteries typically reach End-of-Life (80% capacity) within 50-170 cycles.")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            temperature = st.slider("🌡️ Temperature (°C)", 20, 50, 35)
-            voltage = st.slider("⚡ Voltage (V)", 3.0, 4.5, 3.7, 0.1)
-            cycle_count = st.number_input("🔄 Cycle Count", 0, 2000, 500, 10)
+            temperature = st.slider("🌡️ Temperature (°C)", 4, 44, 24, help="Ambient temperature during operation")
+            voltage = st.slider("⚡ Voltage (V)", 2.5, 4.3, 3.5, 0.05, help="Average measured voltage")
+            cycle_count = st.number_input("🔄 Cycle Count", 1, 200, 50, 1, help="Current charge-discharge cycle number (NASA data: 1-168 cycles)")
         
         with col2:
-            current = st.slider("⚡ Current (A)", -2.0, 2.0, 1.0, 0.1)
-            capacity = st.slider("🔋 Capacity (Ah)", 1.0, 2.5, 1.8, 0.1)
-            model_choice = st.selectbox("🤖 Model", ["XGBoost", "Random Forest", "Linear Regression", "LSTM"])
+            current = st.slider("⚡ Current (A)", -2.0, 0.0, -1.0, 0.1, help="Discharge current (typically negative)")
+            capacity = st.slider("🔋 Current Capacity (Ah)", 0.6, 2.1, 1.5, 0.05, help="Current measured capacity")
+            model_choice = st.selectbox("🤖 Model", ["XGBoost", "Random Forest", "Linear Regression", "LSTM"], help="XGBoost typically performs best")
         
         if st.button("🚀 Predict RUL", use_container_width=True, type="primary"):
             with st.spinner("🔮 Making prediction..."):

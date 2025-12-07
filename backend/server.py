@@ -26,8 +26,9 @@ streamlit_process = None
 def start_streamlit():
     """Start Streamlit in background"""
     global streamlit_process
+    import sys
     streamlit_cmd = [
-        "streamlit", "run", "/app/app.py",
+        sys.executable, "-m", "streamlit", "run", "/app/app.py",
         "--server.port=8501",
         "--server.address=0.0.0.0",
         "--server.headless=true",

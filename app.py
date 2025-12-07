@@ -141,7 +141,7 @@ def home_page():
     # Hero section with image
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.image("https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800", use_container_width=True)
+        st.image("https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800", use_column_width=True)
     
     st.markdown("---")
     

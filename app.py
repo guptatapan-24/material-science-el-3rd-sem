@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from utils.auth import check_authentication, login_page, logout
-from utils.data_processor import load_nasa_dataset, preprocess_data, prepare_training_data, create_user_input_features
+from utils.data_processor import load_nasa_dataset, preprocess_data, prepare_training_data, create_user_input_features, engineer_features
 from utils.ml_models import train_all_models, load_models, predict_rul, simulate_what_if
 from utils.explainer import create_shap_explainer, get_feature_importance
 from utils.visualizer import (

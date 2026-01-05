@@ -216,9 +216,9 @@ class DatasetStatisticsGenerator:
             features_config = {
                 'cycle': {'column': 'cycle', 'description': 'Charge-discharge cycle number'},
                 'capacity': {'column': 'Capacity', 'alt_column': 'capacity', 'description': 'Battery capacity in Ah'},
-                'voltage_measured': {'column': 'voltage_mean', 'alt_column': 'voltage_measured', 'description': 'Measured voltage in V'},
-                'temperature_measured': {'column': 'ambient_temperature', 'alt_column': 'temperature_measured', 'description': 'Temperature in °C'},
-                'current_measured': {'column': 'current_mean', 'alt_column': 'current_measured', 'description': 'Current in A'}
+                'voltage_measured': {'column': 'voltage_mean', 'alt_column': 'voltage_measured', 'description': 'Measured voltage in V', 'use_sampled': True},
+                'temperature_measured': {'column': 'temp_mean', 'alt_column': 'ambient_temperature', 'description': 'Temperature in °C', 'use_sampled': True},
+                'current_measured': {'column': 'current_mean', 'alt_column': 'current_measured', 'description': 'Current in A', 'use_sampled': True}
             }
             
             self.statistics = {
@@ -234,23 +234,44 @@ class DatasetStatisticsGenerator:
             distribution_data = []
             
             for feature_key, config in features_config.items():
-                # Try main column, then alternative
-                column = config['column']
-                if column not in df.columns and 'alt_column' in config:
-                    column = config['alt_column']
+                # For voltage/current/temperature, use sampled values if available
+                use_sampled = config.get('use_sampled', False)
+                sampled_data = None
                 
-                if column in df.columns:
-                    stats = self._compute_feature_statistics(df[column], feature_key)
+                if use_sampled:
+                    if feature_key == 'voltage_measured' and hasattr(self, '_sampled_voltage') and self._sampled_voltage:
+                        sampled_data = pd.Series(self._sampled_voltage)
+                    elif feature_key == 'current_measured' and hasattr(self, '_sampled_current') and self._sampled_current:
+                        sampled_data = pd.Series(self._sampled_current)
+                    elif feature_key == 'temperature_measured' and hasattr(self, '_sampled_temperature') and self._sampled_temperature:
+                        sampled_data = pd.Series(self._sampled_temperature)
+                
+                if sampled_data is not None and len(sampled_data) > 0:
+                    # Use sampled data for more accurate distribution
+                    stats = self._compute_feature_statistics(sampled_data, feature_key)
                     stats['description'] = config['description']
-                    stats['column_used'] = column
+                    stats['column_used'] = 'sampled_from_cycle_files'
                     self.statistics['features'][feature_key] = stats
-                    
-                    # Add to distribution data
-                    row = {'feature': feature_key, 'description': config['description']}
-                    row.update(stats)
-                    distribution_data.append(row)
                 else:
-                    logger.warning(f"Feature column not found: {column} for {feature_key}")
+                    # Try main column, then alternative
+                    column = config['column']
+                    if column not in df.columns and 'alt_column' in config:
+                        column = config['alt_column']
+                    
+                    if column in df.columns:
+                        stats = self._compute_feature_statistics(df[column], feature_key)
+                        stats['description'] = config['description']
+                        stats['column_used'] = column
+                        self.statistics['features'][feature_key] = stats
+                    else:
+                        logger.warning(f"Feature column not found: {column} for {feature_key}")
+                        continue
+                
+                # Add to distribution data
+                if feature_key in self.statistics['features']:
+                    row = {'feature': feature_key, 'description': config['description']}
+                    row.update(self.statistics['features'][feature_key])
+                    distribution_data.append(row)
             
             # Add NASA dataset-specific context
             self.statistics['dataset_context'] = {

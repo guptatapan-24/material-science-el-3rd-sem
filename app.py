@@ -1229,6 +1229,7 @@ def main():
             "🏠 Home": "Home",
             "📈 Predict RUL": "Predict RUL",
             "🔬 What-If Analysis": "What-If",
+            "📊 Dataset Statistics": "Dataset Statistics",
             "ℹ️ About": "About"
         }
         
@@ -1249,6 +1250,8 @@ def main():
         predict_rul_page()
     elif st.session_state.current_page == "What-If":
         what_if_page()
+    elif st.session_state.current_page == "Dataset Statistics":
+        dataset_statistics_page()
     elif st.session_state.current_page == "About":
         about_page()
 

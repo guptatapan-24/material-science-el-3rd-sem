@@ -139,7 +139,7 @@ class PredictionRequest(BaseModel):
 class PredictionResponse(BaseModel):
     """Response schema for battery RUL prediction.
     
-    Phase 3 Enhanced: Includes distribution validation and confidence explanation.
+    Phase 3.5 Enhanced: Includes multi-dataset analysis and cross-dataset confidence.
     """
     predicted_rul_cycles: int = Field(
         ...,
@@ -157,7 +157,7 @@ class PredictionResponse(BaseModel):
         ...,
         description="ML model used for prediction"
     )
-    # Phase 3: New fields for distribution validation
+    # Phase 3: Distribution validation fields
     distribution_status: DistributionStatus = Field(
         default=DistributionStatus.IN_DISTRIBUTION,
         description="Whether input is within training data distribution"
@@ -174,6 +174,19 @@ class PredictionResponse(BaseModel):
         default=None,
         description="Warning message if input is unusual or OOD"
     )
+    # Phase 3.5: Multi-dataset analysis fields
+    dominant_dataset: Optional[str] = Field(
+        default="NASA",
+        description="Dataset that best matches the input characteristics (NASA, CALCE, OXFORD, MATR1)"
+    )
+    cross_dataset_confidence: Optional[str] = Field(
+        default="medium",
+        description="Confidence based on cross-dataset agreement (high, medium, low)"
+    )
+    dataset_coverage_note: Optional[str] = Field(
+        default=None,
+        description="Explanation of which dataset lifecycle patterns the input matches"
+    )
 
     class Config:
         json_schema_extra = {
@@ -185,7 +198,10 @@ class PredictionResponse(BaseModel):
                 "distribution_status": "in_distribution",
                 "life_stage_context": "mid_life",
                 "confidence_explanation": "Prediction has high confidence. Input parameters are consistent with NASA training dataset characteristics.",
-                "inference_warning": None
+                "inference_warning": None,
+                "dominant_dataset": "NASA",
+                "cross_dataset_confidence": "high",
+                "dataset_coverage_note": "Input best matches NASA dataset (score: 85%). Input characteristics suggest late battery life (approaching EOL). Supporting agreement from: CALCE."
             }
         }
 

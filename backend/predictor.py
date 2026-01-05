@@ -26,15 +26,15 @@ MODELS_DIR = "/app/models"
 DATA_DIR = "/app/data"
 
 # Feature columns expected by the models (must match training)
+# Order matches the trained model's feature_names
 FEATURE_COLUMNS = [
-    'cycle', 'cycle_normalized', 'capacity', 'initial_capacity',
-    'capacity_fade', 'capacity_ratio', 'soh', 'ambient_temperature',
-    'Re', 'Rct', 'voltage_mean', 'voltage_std', 'voltage_min',
-    'voltage_max', 'voltage_range', 'voltage_skew', 'voltage_kurtosis',
-    'voltage_slope', 'current_mean', 'current_std', 'current_min',
-    'current_max', 'current_range', 'temp_mean', 'temp_std',
-    'temp_min', 'temp_max', 'temp_range', 'temp_rise',
-    'discharge_time', 'power_mean', 'power_max', 'energy'
+    'cycle', 'voltage_mean', 'voltage_std', 'voltage_min', 'voltage_max',
+    'voltage_range', 'voltage_skew', 'voltage_kurtosis', 'voltage_slope',
+    'current_mean', 'current_std', 'current_min', 'current_max', 'current_range',
+    'temp_mean', 'temp_std', 'temp_min', 'temp_max', 'temp_range', 'temp_rise',
+    'discharge_time', 'power_mean', 'power_max', 'energy', 'capacity',
+    'initial_capacity', 'capacity_fade', 'capacity_ratio', 'ambient_temperature',
+    'Re', 'Rct', 'soh', 'cycle_normalized'
 ]
 
 

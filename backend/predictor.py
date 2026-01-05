@@ -14,16 +14,26 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 import xgboost as xgb
+from pathlib import Path
 
-# Add parent directory to path for utils imports
-sys.path.insert(0, '/app')
+# Cross-platform path resolution
+# Get the directory where this script is located
+SCRIPT_DIR = Path(__file__).resolve().parent
+# Go up one level to get the project root (parent of backend/)
+PROJECT_ROOT = SCRIPT_DIR.parent
+
+# Add project root to path for utils imports
+sys.path.insert(0, str(PROJECT_ROOT))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
-MODELS_DIR = "/app/models"
-DATA_DIR = "/app/data"
+# Constants - Cross-platform paths
+MODELS_DIR = str(PROJECT_ROOT / "models")
+DATA_DIR = str(PROJECT_ROOT / "data")
+
+# Environment variable to force model retraining
+FORCE_RETRAIN = os.environ.get('FORCE_RETRAIN', 'false').lower() in ('true', '1', 'yes')
 
 # Feature columns expected by the models (must match training)
 # Order matches the trained model's feature_names
@@ -60,9 +70,11 @@ class BatteryPredictor:
         """Load pre-trained models from disk or train new ones.
         
         On startup:
-        1. Check if models exist
-        2. Validate feature order matches FEATURE_COLUMNS
-        3. If invalid or missing, retrain automatically
+        1. Check FORCE_RETRAIN environment variable
+        2. Check if models exist
+        3. Validate feature order matches FEATURE_COLUMNS
+        4. Check for sklearn version compatibility
+        5. If invalid, missing, or force retrain, retrain automatically
         """
         model_files = {
             'Linear Regression': 'linear_regression.pkl',
@@ -70,14 +82,38 @@ class BatteryPredictor:
             'XGBoost': 'xgboost.pkl',
         }
         
+        logger.info(f"Models directory: {MODELS_DIR}")
         os.makedirs(MODELS_DIR, exist_ok=True)
+        
+        # Check for force retrain flag
+        if FORCE_RETRAIN:
+            logger.info("FORCE_RETRAIN=true detected. Will retrain all models...")
+            self._clear_old_models()
+            self._train_default_models()
+            self._models_loaded = len(self.models) > 0
+            logger.info(f"Models ready: {list(self.models.keys())}")
+            return
+        
+        # Track if any model had version issues
+        version_mismatch = False
         
         # Try loading existing models
         for name, filename in model_files.items():
             filepath = os.path.join(MODELS_DIR, filename)
             if os.path.exists(filepath):
                 try:
-                    self.models[name] = joblib.load(filepath)
+                    # Capture warnings to detect version mismatches
+                    import warnings
+                    with warnings.catch_warnings(record=True) as w:
+                        warnings.simplefilter("always")
+                        self.models[name] = joblib.load(filepath)
+                        
+                        # Check for version mismatch warnings
+                        for warning in w:
+                            if 'InconsistentVersionWarning' in str(warning.category.__name__):
+                                logger.warning(f"Version mismatch detected for {name}: {warning.message}")
+                                version_mismatch = True
+                    
                     logger.info(f"Loaded {name} model from {filepath}")
                 except Exception as e:
                     logger.warning(f"Failed to load {name}: {e}")
@@ -96,6 +132,16 @@ class BatteryPredictor:
         needs_retrain = False
         if self.models:
             needs_retrain = not self._validate_model_features()
+        
+        # If version mismatch detected, recommend retraining
+        if version_mismatch and not needs_retrain:
+            logger.warning("="*60)
+            logger.warning("SKLEARN VERSION MISMATCH DETECTED!")
+            logger.warning("Models were trained with a different sklearn version.")
+            logger.warning("To retrain models with current sklearn version, either:")
+            logger.warning("  1. Set environment variable: FORCE_RETRAIN=true")
+            logger.warning("  2. Delete the models folder and restart")
+            logger.warning("="*60)
         
         # If no models or invalid features, train fresh models
         if not self.models or needs_retrain:

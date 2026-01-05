@@ -707,7 +707,11 @@ def predict_rul_page():
                         'capacity': capacity,
                         'model': model_used,
                         'battery_health': battery_health,
-                        'confidence': confidence
+                        'confidence': confidence,
+                        'distribution_status': data.get('distribution_status', 'unknown'),
+                        'life_stage_context': data.get('life_stage_context', 'unknown'),
+                        'confidence_explanation': data.get('confidence_explanation', ''),
+                        'inference_warning': data.get('inference_warning', '')
                     }
                     
                     with col1:

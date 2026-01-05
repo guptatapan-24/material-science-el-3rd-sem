@@ -420,6 +420,53 @@ def get_life_stage_badge(stage: str) -> str:
         return '<span class="stage-late">🔻 Late Life</span>'
 
 
+def display_phase3_info(data: Dict[str, Any]):
+    """
+    Display Phase 3 dataset compatibility information.
+    Shows distribution status, life stage, confidence explanation, and warnings.
+    """
+    distribution_status = data.get('distribution_status', 'unknown')
+    life_stage = data.get('life_stage_context', 'unknown')
+    confidence_explanation = data.get('confidence_explanation', '')
+    inference_warning = data.get('inference_warning')
+    
+    # Distribution and Life Stage badges
+    st.markdown("### 📊 Dataset Compatibility Analysis")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**🔍 Distribution Status**")
+        if distribution_status == 'in_distribution':
+            st.success("✓ Within Training Distribution")
+            st.caption("Input parameters match NASA dataset characteristics")
+        else:
+            st.warning("⚠️ Out of Distribution")
+            st.caption("Some values fall outside typical training range")
+    
+    with col2:
+        st.markdown("**🔋 Battery Life Stage**")
+        if life_stage == 'early_life':
+            st.info("🌱 Early Life Stage")
+            st.caption("Battery shows early-life characteristics")
+        elif life_stage == 'mid_life':
+            st.success("🔋 Mid Life Stage")
+            st.caption("Battery in typical operational phase")
+        else:
+            st.warning("🔻 Late Life Stage")
+            st.caption("Battery approaching end-of-life")
+    
+    # Confidence explanation
+    if confidence_explanation:
+        st.markdown("### 💡 Prediction Context")
+        st.info(confidence_explanation)
+    
+    # Inference warning
+    if inference_warning:
+        st.markdown("### ⚠️ Important Notice")
+        st.warning(inference_warning)
+
+
 # ============================================================================
 # PAGE FUNCTIONS
 # ============================================================================

@@ -504,7 +504,9 @@ async def predict_batch(file: UploadFile = File(...)):
                     life_stage_context="unknown",
                     confidence_level="Low",
                     inference_warning=None,
-                    error=str(e)
+                    error=str(e),
+                    dominant_dataset="NASA",
+                    cross_dataset_confidence="low"
                 ))
                 failed += 1
         

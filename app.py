@@ -1153,8 +1153,14 @@ def about_page():
     
     ---
     
-    **Version**: 3.0.0 (Phase 3 - Dataset Compatibility Verification)  
+    **Version**: 3.5.0 (Phase 3.5 - Multi-Dataset Expansion)  
     **Last Updated**: 2025
+    
+    **Phase 3.5 Features:**
+    - Multi-dataset analysis (NASA, CALCE, Oxford, MATR1)
+    - Cross-dataset confidence scoring
+    - Improved early-life battery handling
+    - Dataset coverage explanations
     """)
 
 

@@ -249,6 +249,65 @@ def predict_rul_via_api(
         }
 
 
+def predict_batch_via_api(file) -> Dict[str, Any]:
+    """
+    Make batch RUL prediction by uploading CSV to backend API.
+    
+    Args:
+        file: Uploaded CSV file object
+        
+    Returns:
+        dict: Batch prediction result or error information
+    """
+    try:
+        files = {"file": (file.name, file.getvalue(), "text/csv")}
+        response = requests.post(
+            API_PREDICT_BATCH_ENDPOINT,
+            files=files,
+            timeout=API_TIMEOUT * 2  # Allow more time for batch processing
+        )
+        
+        if response.status_code == 200:
+            return {
+                "success": True,
+                "data": response.json()
+            }
+        else:
+            error_detail = response.json().get('detail', {})
+            error_msg = error_detail.get('message', f'HTTP {response.status_code}')
+            return {
+                "success": False,
+                "error_type": "server_error",
+                "message": error_msg
+            }
+            
+    except requests.exceptions.Timeout:
+        return {
+            "success": False,
+            "error_type": "timeout",
+            "message": "Batch prediction timed out. Try with fewer rows."
+        }
+    except Exception as e:
+        logger.error(f"Batch API error: {e}")
+        return {
+            "success": False,
+            "error_type": "error",
+            "message": str(e)
+        }
+
+
+def get_dataset_statistics() -> Dict[str, Any]:
+    """Fetch dataset statistics from backend API."""
+    try:
+        response = requests.get(API_STATISTICS_ENDPOINT, timeout=API_TIMEOUT)
+        if response.status_code == 200:
+            return response.json()
+        return {}
+    except Exception as e:
+        logger.error(f"Failed to fetch statistics: {e}")
+        return {}
+
+
 def display_api_error(error_result: Dict[str, Any]):
     """
     Display user-friendly error message based on API error type.

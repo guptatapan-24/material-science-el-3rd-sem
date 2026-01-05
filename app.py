@@ -95,6 +95,37 @@ st.markdown("""
     .confidence-low {
         color: #FF4B4B;
     }
+    .dist-in {
+        color: #00CC96;
+        font-weight: bold;
+    }
+    .dist-out {
+        color: #FF4B4B;
+        font-weight: bold;
+    }
+    .stage-early {
+        color: #00CC96;
+    }
+    .stage-mid {
+        color: #FFA500;
+    }
+    .stage-late {
+        color: #FF4B4B;
+    }
+    .explanation-box {
+        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #00CC96;
+        margin: 0.5rem 0;
+    }
+    .warning-box {
+        background: linear-gradient(135deg, #5f3a1e 0%, #875a2d 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #FFA500;
+        margin: 0.5rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 

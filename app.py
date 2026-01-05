@@ -1070,11 +1070,136 @@ def about_page():
     | `/api/health` | GET | Health check and model status |
     | `/api/models` | GET | List available models |
     | `/api/predict` | POST | Make RUL prediction |
+    | `/api/predict/batch` | POST | Batch CSV prediction |
+    | `/api/statistics` | GET | Dataset statistics |
     
     ---
     
-    **Version**: 2.0.0 (Decoupled Architecture)  
+    **Version**: 3.0.0 (Phase 3 - Dataset Compatibility Verification)  
     **Last Updated**: 2025
+    """)
+
+
+def dataset_statistics_page():
+    """Display dataset statistics for Phase 3 transparency."""
+    st.title("📊 Training Dataset Statistics")
+    st.markdown("""
+    Understanding the NASA Li-ion Battery Dataset characteristics helps explain 
+    prediction behavior and confidence levels.
+    """)
+    
+    # Fetch statistics from backend
+    stats = get_dataset_statistics()
+    
+    if not stats:
+        st.error("❌ Unable to fetch dataset statistics from backend")
+        return
+    
+    # Metadata section
+    st.markdown("### 📁 Dataset Metadata")
+    metadata = stats.get('metadata', {})
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("📊 Total Samples", f"{metadata.get('total_samples', 'N/A'):,}")
+    with col2:
+        st.metric("🔋 Batteries Analyzed", metadata.get('batteries_analyzed', 'N/A'))
+    with col3:
+        st.metric("📅 Generated", metadata.get('generation_date', 'N/A')[:10] if metadata.get('generation_date') else 'N/A')
+    
+    st.info(f"**Source:** {metadata.get('dataset_source', 'NASA Li-ion Battery Dataset')}")
+    
+    st.markdown("---")
+    
+    # Feature statistics section
+    st.markdown("### 📈 Feature Statistics")
+    st.markdown("""
+    These statistics define the bounds for **out-of-distribution (OOD) detection**.
+    Values outside the 5th-95th percentile range are flagged as OOD.
+    """)
+    
+    features = stats.get('features', {})
+    
+    if features:
+        # Create a DataFrame for display
+        feature_data = []
+        for feature_name, feature_stats in features.items():
+            feature_data.append({
+                'Feature': feature_name,
+                'Min': f"{feature_stats.get('minimum', 0):.3f}",
+                '5th %': f"{feature_stats.get('percentile_5', 0):.3f}",
+                '25th %': f"{feature_stats.get('percentile_25', 0):.3f}",
+                'Median': f"{feature_stats.get('median', 0):.3f}",
+                'Mean': f"{feature_stats.get('mean', 0):.3f}",
+                '75th %': f"{feature_stats.get('percentile_75', 0):.3f}",
+                '95th %': f"{feature_stats.get('percentile_95', 0):.3f}",
+                'Max': f"{feature_stats.get('maximum', 0):.3f}",
+                'Std Dev': f"{feature_stats.get('standard_deviation', 0):.3f}",
+                'Count': feature_stats.get('count', 0)
+            })
+        
+        stats_df = pd.DataFrame(feature_data)
+        st.dataframe(stats_df, use_container_width=True, hide_index=True)
+        
+        # Individual feature details
+        st.markdown("### 🔍 Feature Details")
+        
+        for feature_name, feature_stats in features.items():
+            with st.expander(f"📊 {feature_name.replace('_', ' ').title()}", expanded=False):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("**Statistical Summary:**")
+                    st.write(f"- **Description:** {feature_stats.get('description', 'N/A')}")
+                    st.write(f"- **Mean:** {feature_stats.get('mean', 0):.4f}")
+                    st.write(f"- **Median:** {feature_stats.get('median', 0):.4f}")
+                    st.write(f"- **Std Deviation:** {feature_stats.get('standard_deviation', 0):.4f}")
+                
+                with col2:
+                    st.markdown("**OOD Detection Bounds:**")
+                    p5 = feature_stats.get('percentile_5', 0)
+                    p95 = feature_stats.get('percentile_95', 0)
+                    st.write(f"- **Lower Bound (5th %):** {p5:.4f}")
+                    st.write(f"- **Upper Bound (95th %):** {p95:.4f}")
+                    st.write(f"- **Valid Range:** [{p5:.3f}, {p95:.3f}]")
+    
+    st.markdown("---")
+    
+    # Dataset context section
+    st.markdown("### ⚠️ Dataset Bias & Limitations")
+    context = stats.get('dataset_context', {})
+    
+    if context:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Dataset Characteristics:**")
+            st.write(f"- **Late-Life Bias:** {'Yes' if context.get('late_life_bias') else 'No'}")
+            st.write(f"- **Dominant Cycle Range:** {context.get('cycle_range_dominant', 'N/A')}")
+            st.write(f"- **Dominant Capacity Range:** {context.get('capacity_range_dominant', 'N/A')}")
+        
+        with col2:
+            st.markdown("**End-of-Life Definition:**")
+            eol = context.get('eol_threshold', 0.8)
+            initial = context.get('initial_capacity_nominal', 2.0)
+            st.write(f"- **EOL Threshold:** {eol*100:.0f}% of initial capacity")
+            st.write(f"- **Nominal Initial Capacity:** {initial} Ah")
+            st.write(f"- **EOL Capacity:** {initial * eol:.2f} Ah")
+    
+    # Important note
+    st.markdown("---")
+    st.warning("""
+    **Important Note for Users:**
+    
+    The NASA dataset primarily contains data from batteries in **mid-to-late life stages** 
+    (aging phase). This means:
+    
+    1. **Early-life batteries** (high capacity, low cycle count) may receive **conservative RUL predictions**
+    2. Predictions are most accurate for batteries matching the training data characteristics
+    3. Out-of-distribution warnings indicate reduced prediction reliability
+    
+    This is scientifically appropriate for safety-critical applications where conservative 
+    estimates are preferable to overestimates.
     """)
 
 

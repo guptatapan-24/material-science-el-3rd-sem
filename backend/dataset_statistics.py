@@ -1,0 +1,356 @@
+"""
+Dataset Statistics Generator for Battery RUL Prediction System
+Computes statistical bounds from NASA training dataset for OOD detection
+"""
+import os
+import json
+import pandas as pd
+import numpy as np
+import logging
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Cross-platform path resolution
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+
+# Dataset paths
+NASA_DATASET_PATH = PROJECT_ROOT / "nasa_dataset" / "cleaned_dataset"
+METADATA_PATH = NASA_DATASET_PATH / "metadata.csv"
+DATA_FOLDER_PATH = NASA_DATASET_PATH / "data"
+PROCESSED_DATA_PATH = PROJECT_ROOT / "data" / "processed_battery_data.csv"
+SAMPLE_DATA_PATH = PROJECT_ROOT / "data" / "sample_battery_data.csv"
+
+# Output paths for statistics
+STATS_OUTPUT_DIR = PROJECT_ROOT / "data"
+STATS_JSON_PATH = STATS_OUTPUT_DIR / "dataset_statistics.json"
+STATS_CSV_PATH = STATS_OUTPUT_DIR / "dataset_distribution.csv"
+
+# Quality batteries from NASA dataset
+QUALITY_BATTERIES = ['B0005', 'B0006', 'B0007', 'B0018', 'B0042', 'B0043', 'B0044', 
+                     'B0045', 'B0046', 'B0047', 'B0048']
+
+# Features to analyze for OOD detection
+# Maps user input names to how they appear in training data
+FEATURE_MAPPING = {
+    'cycle': 'cycle',
+    'capacity': 'Capacity',
+    'voltage_measured': 'voltage_mean',
+    'temperature_measured': 'ambient_temperature',
+    'current_measured': 'current_mean'
+}
+
+
+class DatasetStatisticsGenerator:
+    """Generate and manage dataset statistics for OOD detection."""
+    
+    def __init__(self):
+        self.statistics: Dict[str, Any] = {}
+        self.raw_data: Optional[pd.DataFrame] = None
+        self._load_or_generate_statistics()
+    
+    def _load_or_generate_statistics(self) -> None:
+        """Load existing statistics or generate new ones."""
+        if STATS_JSON_PATH.exists():
+            try:
+                with open(STATS_JSON_PATH, 'r') as f:
+                    self.statistics = json.load(f)
+                logger.info("Loaded existing dataset statistics")
+                return
+            except Exception as e:
+                logger.warning(f"Failed to load statistics: {e}")
+        
+        # Generate new statistics
+        self._generate_statistics()
+    
+    def _load_training_data(self) -> pd.DataFrame:
+        """Load and prepare training data for statistics computation."""
+        try:
+            # Try to load processed data first
+            if PROCESSED_DATA_PATH.exists():
+                df = pd.read_csv(PROCESSED_DATA_PATH)
+                logger.info(f"Loaded processed data: {len(df)} rows")
+                return df
+            
+            # Load from NASA metadata
+            if METADATA_PATH.exists():
+                df = self._process_nasa_metadata()
+                if df is not None and len(df) > 0:
+                    return df
+            
+            # Fallback to sample data
+            if SAMPLE_DATA_PATH.exists():
+                df = pd.read_csv(SAMPLE_DATA_PATH)
+                logger.info(f"Loaded sample data: {len(df)} rows")
+                return df
+            
+            raise FileNotFoundError("No training data found")
+            
+        except Exception as e:
+            logger.error(f"Error loading training data: {e}")
+            raise
+    
+    def _process_nasa_metadata(self) -> Optional[pd.DataFrame]:
+        """Process NASA metadata to extract training statistics."""
+        try:
+            metadata = pd.read_csv(METADATA_PATH)
+            
+            # Convert numeric columns
+            metadata['Capacity'] = pd.to_numeric(metadata['Capacity'], errors='coerce')
+            metadata['Re'] = pd.to_numeric(metadata['Re'], errors='coerce')
+            metadata['Rct'] = pd.to_numeric(metadata['Rct'], errors='coerce')
+            metadata['ambient_temperature'] = pd.to_numeric(metadata['ambient_temperature'], errors='coerce')
+            
+            # Filter to discharge cycles (they have capacity measurements)
+            discharge_df = metadata[metadata['type'] == 'discharge'].copy()
+            
+            # Filter to quality batteries
+            discharge_df = discharge_df[discharge_df['battery_id'].isin(QUALITY_BATTERIES)]
+            
+            # Remove invalid capacity measurements
+            discharge_df = discharge_df[discharge_df['Capacity'] > 0.5]
+            
+            # Add cycle number per battery
+            discharge_df = discharge_df.sort_values(['battery_id', 'test_id'])
+            discharge_df['cycle'] = discharge_df.groupby('battery_id').cumcount() + 1
+            
+            # Extract features from cycle data files (sample some for statistics)
+            voltage_means = []
+            current_means = []
+            temp_means = []
+            
+            for _, row in discharge_df.head(200).iterrows():  # Sample for efficiency
+                filename = row['filename']
+                cycle_path = DATA_FOLDER_PATH / filename
+                if cycle_path.exists():
+                    try:
+                        cycle_data = pd.read_csv(cycle_path)
+                        if 'Voltage_measured' in cycle_data.columns:
+                            voltage_means.append(cycle_data['Voltage_measured'].mean())
+                        if 'Current_measured' in cycle_data.columns:
+                            current_means.append(cycle_data['Current_measured'].mean())
+                        if 'Temperature_measured' in cycle_data.columns:
+                            temp_means.append(cycle_data['Temperature_measured'].mean())
+                    except:
+                        pass
+            
+            # Add aggregated features
+            discharge_df['voltage_mean'] = np.mean(voltage_means) if voltage_means else 3.5
+            discharge_df['current_mean'] = np.mean(current_means) if current_means else -1.0
+            discharge_df['temp_mean'] = np.mean(temp_means) if temp_means else 30.0
+            
+            logger.info(f"Processed NASA metadata: {len(discharge_df)} discharge cycles")
+            return discharge_df
+            
+        except Exception as e:
+            logger.error(f"Error processing NASA metadata: {e}")
+            return None
+    
+    def _compute_feature_statistics(self, data: pd.Series, feature_name: str) -> Dict[str, float]:
+        """Compute comprehensive statistics for a single feature."""
+        # Remove NaN and infinite values
+        clean_data = data.replace([np.inf, -np.inf], np.nan).dropna()
+        
+        if len(clean_data) == 0:
+            logger.warning(f"No valid data for feature: {feature_name}")
+            return {}
+        
+        stats = {
+            'minimum': float(clean_data.min()),
+            'maximum': float(clean_data.max()),
+            'mean': float(clean_data.mean()),
+            'median': float(clean_data.median()),
+            'standard_deviation': float(clean_data.std()),
+            'percentile_5': float(clean_data.quantile(0.05)),
+            'percentile_25': float(clean_data.quantile(0.25)),
+            'percentile_75': float(clean_data.quantile(0.75)),
+            'percentile_95': float(clean_data.quantile(0.95)),
+            'count': int(len(clean_data))
+        }
+        
+        return stats
+    
+    def _generate_statistics(self) -> None:
+        """Generate statistics from training data."""
+        try:
+            df = self._load_training_data()
+            self.raw_data = df
+            
+            # Define features to analyze with their column names in the data
+            features_config = {
+                'cycle': {'column': 'cycle', 'description': 'Charge-discharge cycle number'},
+                'capacity': {'column': 'Capacity', 'alt_column': 'capacity', 'description': 'Battery capacity in Ah'},
+                'voltage_measured': {'column': 'voltage_mean', 'alt_column': 'voltage_measured', 'description': 'Measured voltage in V'},
+                'temperature_measured': {'column': 'ambient_temperature', 'alt_column': 'temperature_measured', 'description': 'Temperature in °C'},
+                'current_measured': {'column': 'current_mean', 'alt_column': 'current_measured', 'description': 'Current in A'}
+            }
+            
+            self.statistics = {
+                'metadata': {
+                    'dataset_source': 'NASA Li-ion Battery Aging Dataset',
+                    'total_samples': len(df),
+                    'batteries_analyzed': df['battery_id'].nunique() if 'battery_id' in df.columns else 0,
+                    'generation_date': pd.Timestamp.now().isoformat()
+                },
+                'features': {}
+            }
+            
+            distribution_data = []
+            
+            for feature_key, config in features_config.items():
+                # Try main column, then alternative
+                column = config['column']
+                if column not in df.columns and 'alt_column' in config:
+                    column = config['alt_column']
+                
+                if column in df.columns:
+                    stats = self._compute_feature_statistics(df[column], feature_key)
+                    stats['description'] = config['description']
+                    stats['column_used'] = column
+                    self.statistics['features'][feature_key] = stats
+                    
+                    # Add to distribution data
+                    row = {'feature': feature_key, 'description': config['description']}
+                    row.update(stats)
+                    distribution_data.append(row)
+                else:
+                    logger.warning(f"Feature column not found: {column} for {feature_key}")
+            
+            # Add NASA dataset-specific context
+            self.statistics['dataset_context'] = {
+                'late_life_bias': True,
+                'cycle_range_dominant': '50-170 cycles',
+                'capacity_range_dominant': '1.2-1.8 Ah',
+                'eol_threshold': 0.8,  # 80% of initial capacity
+                'initial_capacity_nominal': 2.0,
+                'note': 'NASA dataset focuses on aging-phase electrochemical behavior. Early-life batteries may receive conservative predictions.'
+            }
+            
+            # Save statistics
+            self._save_statistics()
+            
+            # Save distribution CSV
+            if distribution_data:
+                dist_df = pd.DataFrame(distribution_data)
+                dist_df.to_csv(STATS_CSV_PATH, index=False)
+                logger.info(f"Saved distribution CSV to {STATS_CSV_PATH}")
+            
+            logger.info(f"Generated statistics for {len(self.statistics['features'])} features")
+            
+        except Exception as e:
+            logger.error(f"Error generating statistics: {e}")
+            # Create fallback statistics based on known NASA dataset characteristics
+            self._create_fallback_statistics()
+    
+    def _create_fallback_statistics(self) -> None:
+        """Create fallback statistics based on known NASA dataset characteristics."""
+        self.statistics = {
+            'metadata': {
+                'dataset_source': 'NASA Li-ion Battery Aging Dataset (Fallback)',
+                'total_samples': 1500,
+                'batteries_analyzed': 11,
+                'generation_date': pd.Timestamp.now().isoformat()
+            },
+            'features': {
+                'cycle': {
+                    'minimum': 1, 'maximum': 168, 'mean': 85, 'median': 84,
+                    'standard_deviation': 48, 'percentile_5': 9, 'percentile_25': 43,
+                    'percentile_75': 126, 'percentile_95': 160, 'count': 1500,
+                    'description': 'Charge-discharge cycle number'
+                },
+                'capacity': {
+                    'minimum': 1.1, 'maximum': 2.0, 'mean': 1.45, 'median': 1.4,
+                    'standard_deviation': 0.22, 'percentile_5': 1.15, 'percentile_25': 1.28,
+                    'percentile_75': 1.62, 'percentile_95': 1.85, 'count': 1500,
+                    'description': 'Battery capacity in Ah'
+                },
+                'voltage_measured': {
+                    'minimum': 2.5, 'maximum': 4.2, 'mean': 3.5, 'median': 3.5,
+                    'standard_deviation': 0.35, 'percentile_5': 2.8, 'percentile_25': 3.2,
+                    'percentile_75': 3.8, 'percentile_95': 4.1, 'count': 1500,
+                    'description': 'Measured voltage in V'
+                },
+                'temperature_measured': {
+                    'minimum': 4, 'maximum': 44, 'mean': 24, 'median': 24,
+                    'standard_deviation': 8, 'percentile_5': 4, 'percentile_25': 20,
+                    'percentile_75': 28, 'percentile_95': 40, 'count': 1500,
+                    'description': 'Temperature in °C'
+                },
+                'current_measured': {
+                    'minimum': -2.0, 'maximum': 0.0, 'mean': -1.0, 'median': -1.0,
+                    'standard_deviation': 0.3, 'percentile_5': -1.8, 'percentile_25': -1.2,
+                    'percentile_75': -0.8, 'percentile_95': -0.2, 'count': 1500,
+                    'description': 'Current in A'
+                }
+            },
+            'dataset_context': {
+                'late_life_bias': True,
+                'cycle_range_dominant': '50-170 cycles',
+                'capacity_range_dominant': '1.2-1.8 Ah',
+                'eol_threshold': 0.8,
+                'initial_capacity_nominal': 2.0,
+                'note': 'NASA dataset focuses on aging-phase electrochemical behavior.'
+            }
+        }
+        self._save_statistics()
+        logger.info("Created fallback statistics")
+    
+    def _save_statistics(self) -> None:
+        """Save statistics to JSON file."""
+        try:
+            os.makedirs(STATS_OUTPUT_DIR, exist_ok=True)
+            with open(STATS_JSON_PATH, 'w') as f:
+                json.dump(self.statistics, f, indent=2)
+            logger.info(f"Saved statistics to {STATS_JSON_PATH}")
+        except Exception as e:
+            logger.error(f"Error saving statistics: {e}")
+    
+    def get_feature_statistics(self, feature_name: str) -> Optional[Dict[str, float]]:
+        """Get statistics for a specific feature."""
+        return self.statistics.get('features', {}).get(feature_name)
+    
+    def get_all_statistics(self) -> Dict[str, Any]:
+        """Get all computed statistics."""
+        return self.statistics
+    
+    def get_ood_bounds(self, feature_name: str) -> Optional[tuple]:
+        """Get OOD detection bounds (5th and 95th percentiles) for a feature."""
+        stats = self.get_feature_statistics(feature_name)
+        if stats:
+            return (stats.get('percentile_5'), stats.get('percentile_95'))
+        return None
+    
+    def get_training_median(self, feature_name: str) -> Optional[float]:
+        """Get training median for a feature."""
+        stats = self.get_feature_statistics(feature_name)
+        if stats:
+            return stats.get('median')
+        return None
+    
+    def regenerate_statistics(self) -> None:
+        """Force regeneration of statistics."""
+        # Remove existing stats file
+        if STATS_JSON_PATH.exists():
+            os.remove(STATS_JSON_PATH)
+        self._generate_statistics()
+
+
+# Global instance
+_statistics_generator: Optional[DatasetStatisticsGenerator] = None
+
+
+def get_statistics_generator() -> DatasetStatisticsGenerator:
+    """Get or create the global statistics generator instance."""
+    global _statistics_generator
+    if _statistics_generator is None:
+        _statistics_generator = DatasetStatisticsGenerator()
+    return _statistics_generator
+
+
+if __name__ == "__main__":
+    # Generate statistics when run directly
+    generator = DatasetStatisticsGenerator()
+    print(json.dumps(generator.get_all_statistics(), indent=2))

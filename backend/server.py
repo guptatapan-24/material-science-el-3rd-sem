@@ -449,6 +449,18 @@ async def predict_batch(file: UploadFile = File(...)):
                     predicted_rul=pred_result['predicted_rul_cycles']
                 )
                 
+                # Phase 3.5: Cross-dataset analysis for batch
+                cross_dataset_result = analyze_input_cross_dataset(
+                    voltage=voltage,
+                    current=current,
+                    temperature=temperature,
+                    cycle=cycle,
+                    capacity=capacity
+                )
+                
+                dominant_dataset = cross_dataset_result.get('dominant_dataset', 'NASA')
+                cross_dataset_conf = cross_dataset_result.get('cross_dataset_confidence', 'medium')
+                
                 # Determine final confidence
                 final_confidence = validation['confidence_level']
                 if validation['distribution_status'] == 'out_of_distribution':

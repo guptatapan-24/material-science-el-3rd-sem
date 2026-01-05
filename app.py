@@ -741,20 +741,154 @@ def predict_rul_page():
                     display_api_error(result)
     
     else:  # Upload CSV
-        st.markdown("### 📤 Upload Battery Data")
-        st.info("📋 Batch prediction via CSV upload - Coming soon! Individual predictions are available via manual input.")
+        st.markdown("### 📤 Batch Prediction via CSV Upload")
+        st.markdown("""
+        Upload a CSV file with battery parameters to get batch RUL predictions.
+        
+        **Required columns:** `voltage`, `current`, `temperature`, `cycle`, `capacity`
+        """)
+        
+        # Download template button
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if st.button("📥 Download Template", use_container_width=True):
+                template_data = {
+                    'voltage': [3.7, 3.5, 3.3],
+                    'current': [-1.0, -1.2, -0.8],
+                    'temperature': [25, 30, 35],
+                    'cycle': [50, 100, 150],
+                    'capacity': [1.8, 1.6, 1.4]
+                }
+                template_df = pd.DataFrame(template_data)
+                st.download_button(
+                    "Download CSV Template",
+                    template_df.to_csv(index=False),
+                    "batch_prediction_template.csv",
+                    "text/csv",
+                    use_container_width=True
+                )
         
         uploaded_file = st.file_uploader(
-            "Upload CSV file (columns: cycle, voltage, current, temperature, capacity)",
-            type=['csv']
+            "Upload CSV file",
+            type=['csv'],
+            help="File must contain columns: voltage, current, temperature, cycle, capacity"
         )
         
         if uploaded_file:
             try:
                 df = pd.read_csv(uploaded_file)
                 st.success(f"✅ File uploaded: {len(df)} rows")
-                st.dataframe(df.head(), use_container_width=True)
-                st.info("🚧 Batch prediction feature is excluded from this phase. Please use manual input for now.")
+                
+                # Validate columns
+                required_cols = ['voltage', 'current', 'temperature', 'cycle', 'capacity']
+                missing_cols = [col for col in required_cols if col not in df.columns]
+                
+                if missing_cols:
+                    st.error(f"❌ Missing required columns: {missing_cols}")
+                    st.info(f"Required columns: {required_cols}")
+                else:
+                    st.markdown("**Preview:**")
+                    st.dataframe(df.head(), use_container_width=True)
+                    
+                    if st.button("🚀 Run Batch Prediction", use_container_width=True, type="primary"):
+                        with st.spinner(f"🔮 Processing {len(df)} predictions..."):
+                            # Reset file pointer and call batch API
+                            uploaded_file.seek(0)
+                            batch_result = predict_batch_via_api(uploaded_file)
+                            
+                            if batch_result['success']:
+                                data = batch_result['data']
+                                
+                                # Summary metrics
+                                st.success(f"✅ Batch prediction complete!")
+                                
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("📊 Total Rows", data['total_rows'])
+                                with col2:
+                                    st.metric("✅ Processed", data['processed_rows'])
+                                with col3:
+                                    st.metric("❌ Failed", data['failed_rows'])
+                                with col4:
+                                    st.metric("📈 Avg RUL", f"{data['summary'].get('avg_rul', 0)} cycles")
+                                
+                                st.markdown("---")
+                                
+                                # Summary statistics
+                                st.markdown("### 📊 Batch Summary")
+                                summary = data['summary']
+                                
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("🟢 Healthy", summary.get('healthy_count', 0))
+                                with col2:
+                                    st.metric("🟡 Moderate", summary.get('moderate_count', 0))
+                                with col3:
+                                    st.metric("🔴 Critical", summary.get('critical_count', 0))
+                                with col4:
+                                    st.metric("⚠️ Out-of-Distribution", summary.get('ood_count', 0))
+                                
+                                st.markdown("---")
+                                
+                                # Results table
+                                st.markdown("### 📋 Detailed Results")
+                                
+                                results_df = pd.DataFrame(data['results'])
+                                
+                                # Color code the dataframe
+                                def style_health(val):
+                                    if val == 'Healthy':
+                                        return 'background-color: #d4edda'
+                                    elif val == 'Moderate':
+                                        return 'background-color: #fff3cd'
+                                    else:
+                                        return 'background-color: #f8d7da'
+                                
+                                # Display results
+                                st.dataframe(
+                                    results_df[[
+                                        'row_index', 'predicted_rul_cycles', 'battery_health',
+                                        'distribution_status', 'life_stage_context', 
+                                        'confidence_level', 'inference_warning'
+                                    ]].rename(columns={
+                                        'row_index': 'Row',
+                                        'predicted_rul_cycles': 'RUL (cycles)',
+                                        'battery_health': 'Health',
+                                        'distribution_status': 'Distribution',
+                                        'life_stage_context': 'Life Stage',
+                                        'confidence_level': 'Confidence',
+                                        'inference_warning': 'Warning'
+                                    }),
+                                    use_container_width=True
+                                )
+                                
+                                # Download results
+                                st.markdown("### 📥 Export Results")
+                                csv_output = results_df.to_csv(index=False)
+                                st.download_button(
+                                    "📊 Download Results CSV",
+                                    csv_output,
+                                    "batch_prediction_results.csv",
+                                    "text/csv",
+                                    use_container_width=True
+                                )
+                                
+                                # OOD explanation if any
+                                if summary.get('ood_count', 0) > 0:
+                                    st.markdown("---")
+                                    st.markdown("### ℹ️ About Out-of-Distribution Results")
+                                    st.info("""
+                                    Some inputs were flagged as **out-of-distribution** because their values 
+                                    fall outside the typical range seen in the NASA training dataset 
+                                    (5th-95th percentile bounds). These predictions may be less reliable.
+                                    
+                                    The NASA dataset focuses on batteries in mid-to-late life stages, 
+                                    so early-life batteries may receive conservative RUL estimates.
+                                    """)
+                                
+                            else:
+                                display_api_error(batch_result)
+                            
             except Exception as e:
                 st.error(f"❌ Error reading file: {e}")
 

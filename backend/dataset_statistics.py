@@ -122,6 +122,8 @@ class DatasetStatisticsGenerator:
             
             # Extract per-cycle features from cycle data files
             # Store actual values for proper distribution computation
+            # For voltage: use user-representative values (instantaneous readings during discharge)
+            # For current/temperature: use mean values per cycle (representative of operating conditions)
             voltage_values = []
             current_values = []
             temp_values = []
@@ -136,10 +138,16 @@ class DatasetStatisticsGenerator:
                     try:
                         cycle_data = pd.read_csv(cycle_path)
                         if 'Voltage_measured' in cycle_data.columns:
-                            # Store mean voltage for this cycle
-                            voltage_values.append(cycle_data['Voltage_measured'].mean())
+                            # For voltage, collect multiple points per cycle to capture full range
+                            # Users input instantaneous voltage, so we need representative distribution
+                            v_data = cycle_data['Voltage_measured'].dropna()
+                            if len(v_data) > 0:
+                                # Sample multiple voltage points from this cycle
+                                sample_size = min(10, len(v_data))
+                                sampled_voltages = v_data.sample(n=sample_size, random_state=42).tolist()
+                                voltage_values.extend(sampled_voltages)
                         if 'Current_measured' in cycle_data.columns:
-                            # Store mean current for this cycle
+                            # Store mean current for this cycle (negative for discharge)
                             current_values.append(cycle_data['Current_measured'].mean())
                         if 'Temperature_measured' in cycle_data.columns:
                             # Store mean temperature for this cycle

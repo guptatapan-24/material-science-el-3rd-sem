@@ -216,6 +216,9 @@ class BatchPredictionRow(BaseModel):
     confidence_level: str = Field(..., description="Confidence level")
     inference_warning: Optional[str] = Field(None, description="Warning if any")
     error: Optional[str] = Field(None, description="Error message if prediction failed")
+    # Phase 3.5: Multi-dataset fields
+    dominant_dataset: Optional[str] = Field(default="NASA", description="Best matching dataset")
+    cross_dataset_confidence: Optional[str] = Field(default="medium", description="Cross-dataset confidence")
 
 
 class BatchPredictionResponse(BaseModel):

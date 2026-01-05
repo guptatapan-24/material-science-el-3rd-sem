@@ -298,7 +298,7 @@ class BatteryPredictor:
             capacity: Current capacity (Ah)
             
         Returns:
-            DataFrame with features matching model input
+            DataFrame with features matching model input in EXACT FEATURE_COLUMNS order
         """
         initial_capacity = 2.0
         capacity_fade = initial_capacity - capacity
@@ -331,17 +331,9 @@ class BatteryPredictor:
         discharge_time = 3000 * capacity_ratio
         energy = power_mean * discharge_time / 3600
         
+        # Create features in EXACT order of FEATURE_COLUMNS
         features = {
             'cycle': cycle,
-            'cycle_normalized': min(cycle / 168.0, 1.0),
-            'capacity': capacity,
-            'initial_capacity': initial_capacity,
-            'capacity_fade': capacity_fade,
-            'capacity_ratio': capacity_ratio,
-            'soh': capacity_ratio * 100,
-            'ambient_temperature': temperature,
-            'Re': Re,
-            'Rct': Rct,
             'voltage_mean': voltage,
             'voltage_std': 0.35 + (capacity_fade * 0.1),
             'voltage_min': voltage_min,
@@ -365,9 +357,20 @@ class BatteryPredictor:
             'power_mean': power_mean,
             'power_max': power_max,
             'energy': energy,
+            'capacity': capacity,
+            'initial_capacity': initial_capacity,
+            'capacity_fade': capacity_fade,
+            'capacity_ratio': capacity_ratio,
+            'ambient_temperature': temperature,
+            'Re': Re,
+            'Rct': Rct,
+            'soh': capacity_ratio * 100,
+            'cycle_normalized': min(cycle / 168.0, 1.0),
         }
         
-        return pd.DataFrame([features])[self.feature_names]
+        # Create DataFrame with explicit column ordering
+        df = pd.DataFrame([features])
+        return df[self.feature_names]
     
     def predict(self, voltage: float, current: float, temperature: float,
                 cycle: int, capacity: float, model_name: str = 'XGBoost') -> dict:

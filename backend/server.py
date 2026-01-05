@@ -66,6 +66,10 @@ async def lifespan(app: FastAPI):
         validator = get_validator()
         logger.info("Distribution validator initialized")
         
+        # Phase 3.5: Initialize multi-dataset statistics manager
+        multi_dataset_mgr = get_multi_dataset_manager()
+        logger.info(f"Multi-dataset statistics initialized for: {list(multi_dataset_mgr.statistics.keys())}")
+        
         logger.info("API ready to serve predictions")
     except Exception as e:
         logger.error(f"Failed to initialize predictor: {e}")

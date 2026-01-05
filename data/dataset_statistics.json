@@ -3,7 +3,7 @@
     "dataset_source": "NASA Li-ion Battery Aging Dataset",
     "total_samples": 1108,
     "batteries_analyzed": 11,
-    "generation_date": "2026-01-05T13:07:30.476282"
+    "generation_date": "2026-01-05T13:27:02.120206"
   },
   "features": {
     "cycle": {
@@ -35,16 +35,16 @@
       "column_used": "Capacity"
     },
     "voltage_measured": {
-      "minimum": 3.268327350028982,
-      "maximum": 3.5712835067487103,
-      "mean": 3.466110316885228,
-      "median": 3.4725304736667644,
-      "standard_deviation": 0.06471643259128357,
-      "percentile_5": 3.347587319399621,
-      "percentile_25": 3.4170049230244954,
-      "percentile_75": 3.510993518851961,
-      "percentile_95": 3.5583404610577674,
-      "count": 300,
+      "minimum": 1.7896213776724978,
+      "maximum": 3.950006152558988,
+      "mean": 3.4800905390186854,
+      "median": 3.498397095019749,
+      "standard_deviation": 0.27578671496429996,
+      "percentile_5": 2.9824821456036728,
+      "percentile_25": 3.367043248668387,
+      "percentile_75": 3.654612867830898,
+      "percentile_95": 3.8578568831711504,
+      "count": 3000,
       "description": "Measured voltage in V",
       "column_used": "sampled_from_cycle_files"
     },

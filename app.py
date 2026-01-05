@@ -27,8 +27,10 @@ logger = logging.getLogger(__name__)
 # Use environment variable or default to localhost for local development
 BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:8001')
 API_PREDICT_ENDPOINT = f"{BACKEND_URL}/api/predict"
+API_PREDICT_BATCH_ENDPOINT = f"{BACKEND_URL}/api/predict/batch"
 API_HEALTH_ENDPOINT = f"{BACKEND_URL}/api/health"
 API_MODELS_ENDPOINT = f"{BACKEND_URL}/api/models"
+API_STATISTICS_ENDPOINT = f"{BACKEND_URL}/api/statistics"
 
 # Request timeout in seconds
 API_TIMEOUT = 30

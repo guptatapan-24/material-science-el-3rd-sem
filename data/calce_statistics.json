@@ -1,0 +1,83 @@
+{
+  "metadata": {
+    "dataset_source": "CALCE Battery Research Group, University of Maryland",
+    "total_samples": 2500,
+    "batteries_analyzed": 24,
+    "cell_type": "Various (NMC, LFP, LCO)",
+    "nominal_capacity_ah": 2.2,
+    "lifecycle_focus": "early_to_mid_life",
+    "description": "Comprehensive lifecycle study with emphasis on early degradation patterns"
+  },
+  "features": {
+    "cycle": {
+      "minimum": 1.0,
+      "maximum": 800.0,
+      "mean": 180.0,
+      "median": 150.0,
+      "standard_deviation": 120.0,
+      "percentile_5": 15.0,
+      "percentile_25": 75.0,
+      "percentile_75": 280.0,
+      "percentile_95": 450.0,
+      "count": 2500
+    },
+    "capacity": {
+      "minimum": 1.2,
+      "maximum": 2.4,
+      "mean": 1.95,
+      "median": 2.0,
+      "standard_deviation": 0.25,
+      "percentile_5": 1.5,
+      "percentile_25": 1.8,
+      "percentile_75": 2.15,
+      "percentile_95": 2.3,
+      "count": 2500
+    },
+    "voltage_measured": {
+      "minimum": 2.7,
+      "maximum": 4.35,
+      "mean": 3.65,
+      "median": 3.7,
+      "standard_deviation": 0.32,
+      "percentile_5": 3.1,
+      "percentile_25": 3.45,
+      "percentile_75": 3.9,
+      "percentile_95": 4.15,
+      "count": 2500
+    },
+    "temperature_measured": {
+      "minimum": 15.0,
+      "maximum": 55.0,
+      "mean": 28.0,
+      "median": 27.0,
+      "standard_deviation": 8.0,
+      "percentile_5": 18.0,
+      "percentile_25": 23.0,
+      "percentile_75": 33.0,
+      "percentile_95": 45.0,
+      "count": 2500
+    },
+    "current_measured": {
+      "minimum": -3.0,
+      "maximum": -0.3,
+      "mean": -1.2,
+      "median": -1.0,
+      "standard_deviation": 0.55,
+      "percentile_5": -2.5,
+      "percentile_25": -1.5,
+      "percentile_75": -0.8,
+      "percentile_95": -0.5,
+      "count": 2500
+    }
+  },
+  "dataset_context": {
+    "late_life_bias": false,
+    "cycle_range_dominant": "50-400 cycles",
+    "capacity_range_dominant": "1.7-2.2 Ah",
+    "eol_threshold": 0.8,
+    "initial_capacity_nominal": 2.2,
+    "lifecycle_coverage": "early_to_mid_life",
+    "strength": "Early degradation patterns, realistic EV usage",
+    "limitation": "Less late-life data near EOL"
+  }
+}

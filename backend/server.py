@@ -265,7 +265,25 @@ async def predict_rul(request: PredictionRequest):
             predicted_rul=predicted_rul
         )
         
-        # Determine final confidence level (use validated confidence if OOD)
+        # Phase 3.5: Perform cross-dataset analysis
+        cross_dataset_result = analyze_input_cross_dataset(
+            voltage=request.voltage,
+            current=request.current,
+            temperature=request.temperature,
+            cycle=request.cycle,
+            capacity=request.capacity
+        )
+        
+        # Determine final confidence based on cross-dataset agreement
+        # Rules:
+        # - High: Closest dataset + at least one additional agrees
+        # - Medium: Strong match with single dataset only
+        # - Low: Weak or no match across datasets
+        cross_dataset_conf = cross_dataset_result.get('cross_dataset_confidence', 'medium')
+        dominant_dataset = cross_dataset_result.get('dominant_dataset', 'NASA')
+        dataset_coverage_note = cross_dataset_result.get('dataset_coverage_note', '')
+        
+        # Combine OOD validation confidence with cross-dataset confidence
         final_confidence = validation['confidence_level']
         if validation['distribution_status'] == 'out_of_distribution':
             # OOD inputs get reduced confidence
@@ -274,10 +292,16 @@ async def predict_rul(request: PredictionRequest):
             elif result['confidence_level'] == 'Medium':
                 final_confidence = 'Low'
         
+        # Enhance confidence explanation with multi-dataset context
+        enhanced_explanation = validation['confidence_explanation']
+        if dataset_coverage_note:
+            enhanced_explanation = f"{enhanced_explanation} {dataset_coverage_note}"
+        
         logger.info(
             f"Prediction made: RUL={predicted_rul} cycles, "
             f"Health={result['battery_health']}, Model={result['model_used']}, "
-            f"Distribution={validation['distribution_status']}, LifeStage={validation['life_stage_context']}"
+            f"Distribution={validation['distribution_status']}, LifeStage={validation['life_stage_context']}, "
+            f"DominantDataset={dominant_dataset}, CrossDatasetConf={cross_dataset_conf}"
         )
         
         return PredictionResponse(
@@ -287,8 +311,11 @@ async def predict_rul(request: PredictionRequest):
             model_used=result['model_used'],
             distribution_status=DistributionStatus(validation['distribution_status']),
             life_stage_context=LifeStageContext(validation['life_stage_context']),
-            confidence_explanation=validation['confidence_explanation'],
-            inference_warning=validation['inference_warning']
+            confidence_explanation=enhanced_explanation,
+            inference_warning=validation['inference_warning'],
+            dominant_dataset=dominant_dataset,
+            cross_dataset_confidence=cross_dataset_conf,
+            dataset_coverage_note=dataset_coverage_note
         )
         
     except ValueError as e:

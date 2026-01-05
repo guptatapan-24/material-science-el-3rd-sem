@@ -8,11 +8,6 @@ env/
 venv/
 ENV/
 
-# Models
-models/*.pkl
-models/*.h5
-models/*.keras
-
 # Data
 data/*.csv
 !data/sample_battery_data.csv

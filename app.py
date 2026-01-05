@@ -424,16 +424,22 @@ def display_phase3_info(data: Dict[str, Any]):
     """
     Display Phase 3 dataset compatibility information.
     Shows distribution status, life stage, confidence explanation, and warnings.
+    Phase 3.5: Enhanced with multi-dataset context.
     """
     distribution_status = data.get('distribution_status', 'unknown')
     life_stage = data.get('life_stage_context', 'unknown')
     confidence_explanation = data.get('confidence_explanation', '')
     inference_warning = data.get('inference_warning')
     
+    # Phase 3.5: Multi-dataset fields
+    dominant_dataset = data.get('dominant_dataset', 'NASA')
+    cross_dataset_confidence = data.get('cross_dataset_confidence', 'medium')
+    dataset_coverage_note = data.get('dataset_coverage_note', '')
+    
     # Distribution and Life Stage badges
     st.markdown("### 📊 Dataset Compatibility Analysis")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown("**🔍 Distribution Status**")
@@ -456,6 +462,45 @@ def display_phase3_info(data: Dict[str, Any]):
             st.warning("🔻 Late Life Stage")
             st.caption("Battery approaching end-of-life")
     
+    with col3:
+        st.markdown("**📚 Dominant Dataset**")
+        dataset_colors = {
+            'NASA': ('🛰️', 'info'),
+            'CALCE': ('🔬', 'success'),
+            'OXFORD': ('🎓', 'warning'),
+            'MATR1': ('📈', 'info')
+        }
+        icon, color = dataset_colors.get(dominant_dataset, ('📊', 'info'))
+        if color == 'success':
+            st.success(f"{icon} {dominant_dataset}")
+        elif color == 'warning':
+            st.warning(f"{icon} {dominant_dataset}")
+        else:
+            st.info(f"{icon} {dominant_dataset}")
+        st.caption(f"Best matching dataset for input")
+    
+    # Cross-dataset confidence display
+    st.markdown("### 🎯 Cross-Dataset Confidence")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        if cross_dataset_confidence == 'high':
+            st.success("🟢 HIGH")
+            st.caption("Multiple datasets agree on lifecycle phase")
+        elif cross_dataset_confidence == 'medium':
+            st.warning("🟡 MEDIUM")
+            st.caption("Single dataset match")
+        else:
+            st.error("🔴 LOW")
+            st.caption("Weak match across datasets")
+    
+    with col2:
+        # Dataset coverage explanation
+        if dataset_coverage_note:
+            st.markdown("**📝 Dataset Coverage Analysis:**")
+            st.info(dataset_coverage_note)
+    
     # Confidence explanation
     if confidence_explanation:
         st.markdown("### 💡 Prediction Context")
@@ -465,6 +510,29 @@ def display_phase3_info(data: Dict[str, Any]):
     if inference_warning:
         st.markdown("### ⚠️ Important Notice")
         st.warning(inference_warning)
+    
+    # Multi-dataset explanation expander
+    with st.expander("ℹ️ About Multi-Dataset Analysis (Phase 3.5)", expanded=False):
+        st.markdown("""
+        **Phase 3.5 Enhancement: Multi-Dataset Expansion**
+        
+        This system now compares your input against multiple battery datasets to improve confidence estimation:
+        
+        | Dataset | Focus | Best For |
+        |---------|-------|----------|
+        | **NASA** | Late-life degradation | Batteries approaching EOL |
+        | **CALCE** | Early-to-mid life | Fresh batteries, EV usage patterns |
+        | **Oxford** | Mid-life, high-resolution | Precise degradation signals |
+        | **MATR1** | Full lifecycle | Long-term cycling behavior |
+        
+        **Confidence Rules:**
+        - 🟢 **High**: Input matches closest dataset AND at least one additional dataset agrees
+        - 🟡 **Medium**: Strong match with a single dataset only
+        - 🔴 **Low**: Weak or no match across all datasets
+        
+        **Note:** The ML models are trained exclusively on NASA data. Other datasets provide context 
+        for confidence estimation only - they don't change the numerical prediction.
+        """)
 
 
 # ============================================================================

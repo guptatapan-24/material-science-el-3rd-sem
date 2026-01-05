@@ -674,6 +674,11 @@ def predict_rul_page():
                     
                     st.markdown("---")
                     
+                    # Phase 3: Display dataset compatibility information
+                    display_phase3_info(data)
+                    
+                    st.markdown("---")
+                    
                     # Capacity fade curve
                     st.markdown("### 📉 Capacity Fade Projection")
                     st.plotly_chart(

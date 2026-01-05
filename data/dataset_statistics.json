@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "dataset_source": "NASA Li-ion Battery Aging Dataset",
+    "total_samples": 1108,
+    "batteries_analyzed": 11,
+    "generation_date": "2026-01-05T13:07:30.476282"
+  },
+  "features": {
+    "cycle": {
+      "minimum": 1.0,
+      "maximum": 168.0,
+      "mean": 60.9485559566787,
+      "median": 51.0,
+      "standard_deviation": 44.34609783934559,
+      "percentile_5": 6.0,
+      "percentile_25": 26.0,
+      "percentile_75": 90.0,
+      "percentile_95": 150.0,
+      "count": 1108,
+      "description": "Charge-discharge cycle number",
+      "column_used": "cycle"
+    },
+    "capacity": {
+      "minimum": 0.6069476168507777,
+      "maximum": 2.035337591005598,
+      "mean": 1.4591351424927457,
+      "median": 1.469465042078706,
+      "standard_deviation": 0.28122927728256486,
+      "percentile_5": 0.7737575463886304,
+      "percentile_25": 1.318592033480978,
+      "percentile_75": 1.6494639784817633,
+      "percentile_95": 1.858208216098928,
+      "count": 1108,
+      "description": "Battery capacity in Ah",
+      "column_used": "Capacity"
+    },
+    "voltage_measured": {
+      "minimum": 3.268327350028982,
+      "maximum": 3.5712835067487103,
+      "mean": 3.466110316885228,
+      "median": 3.4725304736667644,
+      "standard_deviation": 0.06471643259128357,
+      "percentile_5": 3.347587319399621,
+      "percentile_25": 3.4170049230244954,
+      "percentile_75": 3.510993518851961,
+      "percentile_95": 3.5583404610577674,
+      "count": 300,
+      "description": "Measured voltage in V",
+      "column_used": "sampled_from_cycle_files"
+    },
+    "temperature_measured": {
+      "minimum": 7.784854957371514,
+      "maximum": 34.49049358941505,
+      "mean": 25.563342246457513,
+      "median": 31.405879578525045,
+      "standard_deviation": 10.560790023142221,
+      "percentile_5": 7.959945014845802,
+      "percentile_25": 9.484887425680027,
+      "percentile_75": 32.56242385526884,
+      "percentile_95": 33.74678956067379,
+      "count": 300,
+      "description": "Temperature in \u00b0C",
+      "column_used": "sampled_from_cycle_files"
+    },
+    "current_measured": {
+      "minimum": -1.9997552547832569,
+      "maximum": -0.5953707956325988,
+      "mean": -1.5813871460014677,
+      "median": -1.7990806140356954,
+      "standard_deviation": 0.43232109973464666,
+      "percentile_5": -1.9880752952772485,
+      "percentile_25": -1.894321150294464,
+      "percentile_75": -1.001255238403972,
+      "percentile_95": -0.8933337622268506,
+      "count": 300,
+      "description": "Current in A",
+      "column_used": "sampled_from_cycle_files"
+    }
+  },
+  "dataset_context": {
+    "late_life_bias": true,
+    "cycle_range_dominant": "50-170 cycles",
+    "capacity_range_dominant": "1.2-1.8 Ah",
+    "eol_threshold": 0.8,
+    "initial_capacity_nominal": 2.0,
+    "note": "NASA dataset focuses on aging-phase electrochemical behavior. Early-life batteries may receive conservative predictions."
+  }
+}

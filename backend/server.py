@@ -31,6 +31,10 @@ from schemas import (
 from predictor import get_predictor, BatteryPredictor
 from distribution_validator import validate_prediction_input, get_validator
 from dataset_statistics import get_statistics_generator
+from multi_dataset_statistics import (
+    get_multi_dataset_manager,
+    analyze_input_cross_dataset
+)
 
 # Configure logging
 logging.basicConfig(

@@ -35,6 +35,21 @@ class LifeStageContext(str, Enum):
     LATE_LIFE = "late_life"
 
 
+class DatasetSource(str, Enum):
+    """Supported dataset sources for multi-dataset analysis."""
+    NASA = "NASA"
+    CALCE = "CALCE"
+    OXFORD = "OXFORD"
+    MATR1 = "MATR1"
+
+
+class CrossDatasetConfidence(str, Enum):
+    """Cross-dataset confidence levels based on dataset agreement."""
+    HIGH = "high"      # Closest dataset + at least one additional agrees
+    MEDIUM = "medium"  # Strong match with single dataset only
+    LOW = "low"        # Weak or no match across datasets
+
+
 class PredictionRequest(BaseModel):
     """Request schema for battery RUL prediction.
     

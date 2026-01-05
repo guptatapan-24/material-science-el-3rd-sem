@@ -921,7 +921,8 @@ def predict_rul_page():
                                     results_df[[
                                         'row_index', 'predicted_rul_cycles', 'battery_health',
                                         'distribution_status', 'life_stage_context', 
-                                        'confidence_level', 'inference_warning'
+                                        'confidence_level', 'dominant_dataset', 
+                                        'cross_dataset_confidence', 'inference_warning'
                                     ]].rename(columns={
                                         'row_index': 'Row',
                                         'predicted_rul_cycles': 'RUL (cycles)',
@@ -929,6 +930,8 @@ def predict_rul_page():
                                         'distribution_status': 'Distribution',
                                         'life_stage_context': 'Life Stage',
                                         'confidence_level': 'Confidence',
+                                        'dominant_dataset': 'Dataset',
+                                        'cross_dataset_confidence': 'Cross-DS Conf',
                                         'inference_warning': 'Warning'
                                     }),
                                     use_container_width=True

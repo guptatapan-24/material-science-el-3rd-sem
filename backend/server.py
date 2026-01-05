@@ -489,7 +489,9 @@ async def predict_batch(file: UploadFile = File(...)):
                     life_stage_context=validation['life_stage_context'],
                     confidence_level=final_confidence,
                     inference_warning=validation['inference_warning'],
-                    error=None
+                    error=None,
+                    dominant_dataset=dominant_dataset,
+                    cross_dataset_confidence=cross_dataset_conf
                 ))
                 processed += 1
                 

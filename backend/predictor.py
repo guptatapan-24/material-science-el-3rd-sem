@@ -162,14 +162,29 @@ class BatteryPredictor:
                     logger.warning(f"Failed to remove {filename}: {e}")
     
     def _load_or_create_scaler(self) -> None:
-        """Load or create a feature scaler."""
+        """Load or create a feature scaler.
+        
+        Validates scaler has correct feature names before using.
+        """
         scaler_path = os.path.join(MODELS_DIR, 'scaler.pkl')
         
         if os.path.exists(scaler_path):
             try:
-                self.scaler = joblib.load(scaler_path)
-                logger.info("Loaded scaler from disk")
-                return
+                loaded_scaler = joblib.load(scaler_path)
+                # Validate scaler features match
+                if hasattr(loaded_scaler, 'feature_names_in_'):
+                    scaler_features = list(loaded_scaler.feature_names_in_)
+                    if scaler_features == self.feature_names:
+                        self.scaler = loaded_scaler
+                        logger.info("Loaded and validated scaler from disk")
+                        return
+                    else:
+                        logger.warning("Scaler feature mismatch, creating new scaler...")
+                else:
+                    # Old scaler without feature names, recreate
+                    self.scaler = loaded_scaler
+                    logger.info("Loaded scaler from disk (legacy format)")
+                    return
             except Exception as e:
                 logger.warning(f"Failed to load scaler: {e}")
         

@@ -1,21 +1,37 @@
+"""
+Streamlit Frontend for Battery RUL Prediction System
+Decoupled client - delegates all ML inference to FastAPI backend
+"""
 import streamlit as st
 import pandas as pd
 import numpy as np
+import requests
+import logging
+import os
+from typing import Optional, Dict, Any
+
 from utils.auth import check_authentication, login_page, logout
-from utils.data_processor import load_nasa_dataset, preprocess_data, prepare_training_data, create_user_input_features, engineer_features
-from utils.ml_models import train_all_models, load_models, predict_rul, simulate_what_if
-from utils.explainer import create_shap_explainer, get_feature_importance
+from utils.data_processor import load_nasa_dataset, preprocess_data
 from utils.visualizer import (
     plot_capacity_fade_curve, plot_model_comparison, plot_r2_comparison,
     plot_feature_importance, plot_what_if_comparison, plot_sustainability_impact,
     create_metrics_table
 )
 from utils.report_generator import generate_csv_report, generate_pdf_report
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Backend API Configuration
+# Use environment variable or default to localhost for local development
+BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:8001')
+API_PREDICT_ENDPOINT = f"{BACKEND_URL}/api/predict"
+API_HEALTH_ENDPOINT = f"{BACKEND_URL}/api/health"
+API_MODELS_ENDPOINT = f"{BACKEND_URL}/api/models"
+
+# Request timeout in seconds
+API_TIMEOUT = 30
 
 # Page config
 st.set_page_config(
@@ -56,87 +72,260 @@ st.markdown("""
         height: 3em;
         font-weight: bold;
     }
+    .health-healthy {
+        color: #00CC96;
+        font-weight: bold;
+    }
+    .health-moderate {
+        color: #FFA500;
+        font-weight: bold;
+    }
+    .health-critical {
+        color: #FF4B4B;
+        font-weight: bold;
+    }
+    .confidence-high {
+        color: #00CC96;
+    }
+    .confidence-medium {
+        color: #FFA500;
+    }
+    .confidence-low {
+        color: #FF4B4B;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Initialize session state
-if 'data_loaded' not in st.session_state:
-    st.session_state.data_loaded = False
-if 'models_trained' not in st.session_state:
-    st.session_state.models_trained = False
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "Home"
+if 'backend_status' not in st.session_state:
+    st.session_state.backend_status = None
+if 'available_models' not in st.session_state:
+    st.session_state.available_models = []
 
-def load_data_and_models():
-    """Load dataset and pre-trained models."""
-    if not st.session_state.data_loaded:
-        with st.spinner("🔄 Loading NASA battery dataset..."):
-            try:
-                df = load_nasa_dataset()
-                df_clean = preprocess_data(df)
-                X, y, scaler, feature_names = prepare_training_data(df_clean)
-                
-                st.session_state.df = df_clean
-                st.session_state.X = X
-                st.session_state.y = y
-                st.session_state.scaler = scaler
-                st.session_state.feature_names = feature_names
-                st.session_state.data_loaded = True
-                
-                logger.info(f"Data loaded: {len(df_clean)} samples, {len(feature_names)} features")
-            except Exception as e:
-                st.error(f"❌ Error loading data: {e}")
-                return False
+
+# ============================================================================
+# API CLIENT FUNCTIONS - All backend communication goes through these
+# ============================================================================
+
+def check_backend_health() -> Dict[str, Any]:
+    """
+    Check if the backend API is healthy and models are loaded.
     
-    if not st.session_state.models_trained:
-        with st.spinner("🤖 Training/Loading ML models (this may take a moment)..."):
-            try:
-                # Try loading pre-trained models first
-                models = load_models()
-                
-                if len(models) < 3:  # Not all models loaded
-                    st.info("Training models for the first time...")
-                    # Train models
-                    from sklearn.model_selection import train_test_split
-                    X_train, X_test, y_train, y_test = train_test_split(
-                        st.session_state.X, st.session_state.y, 
-                        test_size=0.2, random_state=42
-                    )
-                    models, metrics = train_all_models(X_train, y_train, X_test, y_test)
-                    st.session_state.metrics = metrics
-                else:
-                    # Calculate metrics for loaded models
-                    from sklearn.model_selection import train_test_split
-                    X_train, X_test, y_train, y_test = train_test_split(
-                        st.session_state.X, st.session_state.y, 
-                        test_size=0.2, random_state=42
-                    )
-                    st.session_state.metrics = {}
-                    for name, model in models.items():
-                        if name == 'LSTM':
-                            X_reshaped = X_test.values.reshape((X_test.shape[0], 1, X_test.shape[1]))
-                            y_pred = model.predict(X_reshaped, verbose=0).flatten()
-                        else:
-                            y_pred = model.predict(X_test)
-                        
-                        from utils.ml_models import calculate_metrics
-                        st.session_state.metrics[name] = calculate_metrics(y_test, y_pred)
-                
-                st.session_state.models = models
-                st.session_state.models_trained = True
-                
-                logger.info(f"Models ready: {list(models.keys())}")
-            except Exception as e:
-                st.error(f"❌ Error with models: {e}")
-                logger.error(f"Model error: {e}")
-                return False
+    Returns:
+        dict: Health status including available models
+    """
+    try:
+        response = requests.get(API_HEALTH_ENDPOINT, timeout=API_TIMEOUT)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.ConnectionError:
+        logger.error("Backend connection failed - service may be down")
+        return {"status": "unavailable", "error": "Cannot connect to prediction service"}
+    except requests.exceptions.Timeout:
+        logger.error("Backend health check timed out")
+        return {"status": "timeout", "error": "Service response timeout"}
+    except Exception as e:
+        logger.error(f"Backend health check error: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+def get_available_models() -> list:
+    """
+    Fetch list of available ML models from backend.
     
-    return True
+    Returns:
+        list: Available model names
+    """
+    try:
+        response = requests.get(API_MODELS_ENDPOINT, timeout=API_TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        return data.get('models', [])
+    except Exception as e:
+        logger.error(f"Failed to fetch models: {e}")
+        return []
+
+
+def predict_rul_via_api(
+    voltage: float,
+    current: float,
+    temperature: float,
+    cycle: int,
+    capacity: float,
+    model_name: str = "XGBoost"
+) -> Dict[str, Any]:
+    """
+    Make RUL prediction by calling the backend API.
+    
+    Args:
+        voltage: Battery voltage (V)
+        current: Battery current (A)
+        temperature: Temperature (°C)
+        cycle: Cycle count
+        capacity: Current capacity (Ah)
+        model_name: ML model to use
+        
+    Returns:
+        dict: Prediction result or error information
+    """
+    payload = {
+        "voltage": voltage,
+        "current": current,
+        "temperature": temperature,
+        "cycle": cycle,
+        "capacity": capacity,
+        "model_name": model_name
+    }
+    
+    try:
+        response = requests.post(
+            API_PREDICT_ENDPOINT,
+            json=payload,
+            timeout=API_TIMEOUT
+        )
+        
+        # Handle different response codes
+        if response.status_code == 200:
+            return {
+                "success": True,
+                "data": response.json()
+            }
+        elif response.status_code == 422:
+            # Validation error from backend
+            error_detail = response.json().get('detail', {})
+            error_msg = error_detail.get('message', 'Invalid input parameters')
+            return {
+                "success": False,
+                "error_type": "validation",
+                "message": error_msg
+            }
+        elif response.status_code == 503:
+            # Service unavailable
+            return {
+                "success": False,
+                "error_type": "service_unavailable",
+                "message": "Prediction service is temporarily unavailable. Please try again later."
+            }
+        elif response.status_code == 500:
+            # Server error
+            error_detail = response.json().get('detail', {})
+            error_msg = error_detail.get('message', 'Internal server error')
+            return {
+                "success": False,
+                "error_type": "server_error",
+                "message": f"Server error: {error_msg}"
+            }
+        else:
+            return {
+                "success": False,
+                "error_type": "unknown",
+                "message": f"Unexpected response (HTTP {response.status_code})"
+            }
+            
+    except requests.exceptions.ConnectionError:
+        logger.error("Failed to connect to backend API")
+        return {
+            "success": False,
+            "error_type": "connection",
+            "message": "Cannot connect to prediction service. Please ensure the backend is running."
+        }
+    except requests.exceptions.Timeout:
+        logger.error("Backend API request timed out")
+        return {
+            "success": False,
+            "error_type": "timeout",
+            "message": "Request timed out. Please try again."
+        }
+    except Exception as e:
+        logger.error(f"API request error: {e}")
+        return {
+            "success": False,
+            "error_type": "error",
+            "message": f"An error occurred: {str(e)}"
+        }
+
+
+def display_api_error(error_result: Dict[str, Any]):
+    """
+    Display user-friendly error message based on API error type.
+    
+    Args:
+        error_result: Error information from API call
+    """
+    error_type = error_result.get('error_type', 'unknown')
+    message = error_result.get('message', 'An unknown error occurred')
+    
+    if error_type == 'validation':
+        st.error(f"⚠️ **Validation Error**: {message}")
+        st.info("💡 Please check your input values are within valid ranges.")
+    elif error_type == 'service_unavailable':
+        st.error(f"🔧 **Service Unavailable**: {message}")
+        st.warning("⏳ The prediction models may still be loading. Please wait and try again.")
+    elif error_type == 'connection':
+        st.error(f"🔌 **Connection Error**: {message}")
+        st.info("💡 Make sure the backend server is running on the expected port.")
+    elif error_type == 'timeout':
+        st.error(f"⏱️ **Timeout**: {message}")
+    else:
+        st.error(f"❌ **Error**: {message}")
+
+
+def get_health_badge(health_status: str) -> str:
+    """
+    Get HTML badge for battery health status.
+    
+    Args:
+        health_status: Health classification from backend
+        
+    Returns:
+        str: HTML formatted badge
+    """
+    health_lower = health_status.lower()
+    if health_lower == 'healthy':
+        return f'<span class="health-healthy">🟢 {health_status}</span>'
+    elif health_lower == 'moderate':
+        return f'<span class="health-moderate">🟡 {health_status}</span>'
+    else:
+        return f'<span class="health-critical">🔴 {health_status}</span>'
+
+
+def get_confidence_badge(confidence: str) -> str:
+    """
+    Get HTML badge for confidence level.
+    
+    Args:
+        confidence: Confidence level from backend
+        
+    Returns:
+        str: HTML formatted badge
+    """
+    conf_lower = confidence.lower()
+    if conf_lower == 'high':
+        return f'<span class="confidence-high">✓ {confidence}</span>'
+    elif conf_lower == 'medium':
+        return f'<span class="confidence-medium">~ {confidence}</span>'
+    else:
+        return f'<span class="confidence-low">? {confidence}</span>'
+
+
+# ============================================================================
+# PAGE FUNCTIONS
+# ============================================================================
 
 def home_page():
     """Display home page."""
     st.markdown("<h1 class='main-header'>🔋 AI-Powered Battery RUL Prediction</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Predict Remaining Useful Life of Lithium-Ion Batteries in Electric Vehicles</p>", unsafe_allow_html=True)
+    
+    # Backend status indicator
+    health = check_backend_health()
+    if health.get('status') == 'healthy':
+        st.success(f"✅ Backend Connected | Models Available: {', '.join(health.get('available_models', []))}")
+        st.session_state.available_models = health.get('available_models', [])
+    else:
+        st.warning(f"⚠️ Backend Status: {health.get('status', 'unknown')} - {health.get('error', '')}")
     
     # Hero section with image
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -203,27 +392,41 @@ def home_page():
             st.rerun()
     
     with col2:
-        if st.button("🧠 Train Models", use_container_width=True):
-            st.session_state.current_page = "Train Models"
-            st.rerun()
-    
-    with col3:
         if st.button("🔬 What-If Analysis", use_container_width=True):
             st.session_state.current_page = "What-If"
             st.rerun()
+    
+    with col3:
+        if st.button("ℹ️ About", use_container_width=True):
+            st.session_state.current_page = "About"
+            st.rerun()
+
 
 def predict_rul_page():
-    """Display RUL prediction page."""
+    """Display RUL prediction page - uses backend API for all predictions."""
     st.title("📈 Battery RUL Prediction")
-    st.markdown("Input battery parameters or upload data to predict remaining useful life.")
+    st.markdown("Input battery parameters to predict remaining useful life via our AI backend.")
     
-    # Show model information
-    if st.session_state.models_trained and 'metrics' in st.session_state:
-        with st.expander("📊 Current Model Performance (R² Scores)", expanded=False):
-            col1, col2, col3, col4 = st.columns(4)
-            for i, (model_name, metrics) in enumerate(st.session_state.metrics.items()):
-                with [col1, col2, col3, col4][i % 4]:
-                    st.metric(model_name, f"R² = {metrics['R2']:.3f}")
+    # Check backend status
+    health = check_backend_health()
+    if health.get('status') != 'healthy':
+        st.error(f"⚠️ Backend service unavailable: {health.get('error', 'Unknown error')}")
+        st.info("💡 Please ensure the backend server is running and try again.")
+        if st.button("🔄 Retry Connection"):
+            st.rerun()
+        return
+    
+    # Get available models from backend
+    available_models = health.get('available_models', ['XGBoost'])
+    
+    # Show backend info
+    with st.expander("📊 Backend Service Info", expanded=False):
+        st.json({
+            "status": health.get('status'),
+            "service": health.get('service'),
+            "models_loaded": health.get('models_loaded'),
+            "available_models": available_models
+        })
     
     # Input method selection
     input_method = st.radio("📥 Input Method", ["Manual Input", "Upload CSV"], horizontal=True)
@@ -235,139 +438,152 @@ def predict_rul_page():
         col1, col2 = st.columns(2)
         
         with col1:
-            temperature = st.slider("🌡️ Temperature (°C)", 4, 44, 24, help="Ambient temperature during operation")
-            voltage = st.slider("⚡ Voltage (V)", 2.5, 4.3, 3.5, 0.05, help="Average measured voltage")
-            cycle_count = st.number_input("🔄 Cycle Count", 1, 200, 50, 1, help="Current charge-discharge cycle number (NASA data: 1-168 cycles)")
+            temperature = st.slider(
+                "🌡️ Temperature (°C)", 
+                0, 70, 24, 
+                help="Ambient temperature during operation (0-70°C)"
+            )
+            voltage = st.slider(
+                "⚡ Voltage (V)", 
+                2.0, 4.5, 3.7, 0.05, 
+                help="Average measured voltage (2.0-4.5V)"
+            )
+            cycle_count = st.number_input(
+                "🔄 Cycle Count", 
+                0, 500, 50, 1, 
+                help="Current charge-discharge cycle number"
+            )
         
         with col2:
-            current = st.slider("⚡ Current (A)", -2.0, 0.0, -1.0, 0.1, help="Discharge current (typically negative)")
-            capacity = st.slider("🔋 Current Capacity (Ah)", 0.6, 2.1, 1.5, 0.05, help="Current measured capacity")
-            model_choice = st.selectbox("🤖 Model", ["XGBoost", "Random Forest", "Linear Regression", "LSTM"], help="XGBoost typically performs best")
+            current = st.slider(
+                "⚡ Current (A)", 
+                -2.0, 0.0, -1.0, 0.1, 
+                help="Discharge current (typically negative)"
+            )
+            capacity = st.slider(
+                "🔋 Current Capacity (Ah)", 
+                0.5, 2.5, 1.8, 0.05, 
+                help="Current measured capacity"
+            )
+            model_choice = st.selectbox(
+                "🤖 Model", 
+                available_models,
+                index=available_models.index("XGBoost") if "XGBoost" in available_models else 0,
+                help="Select ML model for prediction"
+            )
         
         if st.button("🚀 Predict RUL", use_container_width=True, type="primary"):
-            with st.spinner("🔮 Making prediction..."):
-                try:
-                    # Create features from user input
-                    user_features = create_user_input_features(
-                        voltage, current, temperature, cycle_count, capacity
+            with st.spinner("🔮 Calling prediction API..."):
+                # Call backend API for prediction
+                result = predict_rul_via_api(
+                    voltage=voltage,
+                    current=current,
+                    temperature=temperature,
+                    cycle=cycle_count,
+                    capacity=capacity,
+                    model_name=model_choice
+                )
+                
+                if result['success']:
+                    data = result['data']
+                    predicted_rul = data['predicted_rul_cycles']
+                    battery_health = data['battery_health']
+                    confidence = data['confidence_level']
+                    model_used = data['model_used']
+                    
+                    # Display results
+                    st.success("✅ Prediction Complete!")
+                    
+                    # Main metrics
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("🔋 Predicted RUL", f"{predicted_rul} cycles")
+                    
+                    with col2:
+                        years = predicted_rul / 365
+                        st.metric("📅 Estimated Time", f"{years:.1f} years")
+                    
+                    with col3:
+                        st.markdown(f"**💚 Battery Health**")
+                        st.markdown(get_health_badge(battery_health), unsafe_allow_html=True)
+                    
+                    with col4:
+                        st.markdown(f"**📊 Confidence**")
+                        st.markdown(get_confidence_badge(confidence), unsafe_allow_html=True)
+                    
+                    # Model info footer
+                    st.caption(f"🤖 Model used: {model_used}")
+                    
+                    st.markdown("---")
+                    
+                    # Capacity fade curve
+                    st.markdown("### 📉 Capacity Fade Projection")
+                    st.plotly_chart(
+                        plot_capacity_fade_curve(cycle_count, predicted_rul, capacity),
+                        use_container_width=True
                     )
                     
-                    # Ensure features match training
-                    for col in st.session_state.feature_names:
-                        if col not in user_features.columns:
-                            user_features[col] = 0
-                    
-                    user_features = user_features[st.session_state.feature_names]
-                    
-                    # Normalize
-                    user_features_scaled = pd.DataFrame(
-                        st.session_state.scaler.transform(user_features),
-                        columns=user_features.columns
+                    # Sustainability impact
+                    st.markdown("### 🌍 Environmental Impact")
+                    st.plotly_chart(
+                        plot_sustainability_impact(predicted_rul),
+                        use_container_width=True
                     )
                     
-                    # Predict
-                    model = st.session_state.models[model_choice]
-                    predicted_rul = predict_rul(model, user_features_scaled, model_choice)
+                    # Export options
+                    st.markdown("### 📥 Export Results")
+                    col1, col2 = st.columns(2)
                     
-                    if predicted_rul is not None:
-                        # Display results
-                        st.success("✅ Prediction Complete!")
-                        
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("🔋 Predicted RUL", f"{predicted_rul:.0f} cycles")
-                        with col2:
-                            years = predicted_rul / 365
-                            st.metric("📅 Estimated Time", f"{years:.1f} years")
-                        with col3:
-                            health = (capacity / 2.0) * 100
-                            st.metric("💚 Battery Health", f"{health:.0f}%")
-                        
-                        # Capacity fade curve
-                        st.plotly_chart(
-                            plot_capacity_fade_curve(cycle_count, predicted_rul, capacity),
-                            use_container_width=True
-                        )
-                        
-                        # Sustainability impact
-                        st.markdown("### 🌍 Environmental Impact")
-                        st.plotly_chart(
-                            plot_sustainability_impact(predicted_rul),
-                            use_container_width=True
-                        )
-                        
-                        # SHAP explanation
-                        if model_choice != "LSTM":  # SHAP works best with tree models
-                            with st.expander("🔍 Model Explanation (SHAP)"):
-                                try:
-                                    explainer = create_shap_explainer(
-                                        model, st.session_state.X, model_choice
-                                    )
-                                    if explainer:
-                                        importance = get_feature_importance(
-                                            explainer, user_features_scaled, 
-                                            st.session_state.feature_names, top_n=10
-                                        )
-                                        if importance is not None:
-                                            st.plotly_chart(
-                                                plot_feature_importance(importance),
-                                                use_container_width=True
-                                            )
-                                except Exception as e:
-                                    st.warning(f"SHAP explanation unavailable: {e}")
-                        
-                        # Export options
-                        st.markdown("### 📥 Export Results")
-                        col1, col2 = st.columns(2)
-                        
-                        prediction_data = {
-                            'rul': f"{predicted_rul:.0f}",
-                            'time_estimate': f"{years:.1f}",
-                            'cycle': cycle_count,
-                            'temperature': temperature,
-                            'voltage': voltage,
-                            'current': current,
-                            'capacity': capacity,
-                            'model': model_choice
-                        }
-                        
-                        with col1:
-                            csv_data = generate_csv_report(prediction_data)
-                            if csv_data:
-                                st.download_button(
-                                    "📊 Download CSV",
-                                    csv_data,
-                                    "battery_rul_report.csv",
-                                    "text/csv",
-                                    use_container_width=True
-                                )
-                        
-                        with col2:
-                            pdf_data = generate_pdf_report(
-                                prediction_data, 
-                                st.session_state.username
+                    prediction_data = {
+                        'rul': f"{predicted_rul}",
+                        'time_estimate': f"{years:.1f}",
+                        'cycle': cycle_count,
+                        'temperature': temperature,
+                        'voltage': voltage,
+                        'current': current,
+                        'capacity': capacity,
+                        'model': model_used,
+                        'battery_health': battery_health,
+                        'confidence': confidence
+                    }
+                    
+                    with col1:
+                        csv_data = generate_csv_report(prediction_data)
+                        if csv_data:
+                            st.download_button(
+                                "📊 Download CSV",
+                                csv_data,
+                                "battery_rul_report.csv",
+                                "text/csv",
+                                use_container_width=True
                             )
-                            if pdf_data:
-                                st.download_button(
-                                    "📄 Download PDF",
-                                    pdf_data,
-                                    "battery_rul_report.pdf",
-                                    "application/pdf",
-                                    use_container_width=True
-                                )
-                        
-                        st.balloons()
-                    else:
-                        st.error("❌ Prediction failed. Please try again.")
-                        
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
-                    logger.error(f"Prediction error: {e}")
+                    
+                    with col2:
+                        pdf_data = generate_pdf_report(
+                            prediction_data, 
+                            st.session_state.get('username', 'User')
+                        )
+                        if pdf_data:
+                            st.download_button(
+                                "📄 Download PDF",
+                                pdf_data,
+                                "battery_rul_report.pdf",
+                                "application/pdf",
+                                use_container_width=True
+                            )
+                    
+                    st.balloons()
+                else:
+                    # Display error from API
+                    display_api_error(result)
     
     else:  # Upload CSV
         st.markdown("### 📤 Upload Battery Data")
+        st.info("📋 Batch prediction via CSV upload - Coming soon! Individual predictions are available via manual input.")
+        
         uploaded_file = st.file_uploader(
-            "Upload CSV file (columns: cycle, voltage_measured, current_measured, temperature_measured, capacity)",
+            "Upload CSV file (columns: cycle, voltage, current, temperature, capacity)",
             type=['csv']
         )
         
@@ -376,173 +592,77 @@ def predict_rul_page():
                 df = pd.read_csv(uploaded_file)
                 st.success(f"✅ File uploaded: {len(df)} rows")
                 st.dataframe(df.head(), use_container_width=True)
-                
-                if st.button("🚀 Predict from CSV", use_container_width=True, type="primary"):
-                    with st.spinner("Processing..."):
-                        # Process uploaded data
-                        df_clean = preprocess_data(df)
-                        features = engineer_features(df_clean)
-                        # Continue with prediction...
-                        st.info("Batch prediction feature coming soon!")
-                        
+                st.info("🚧 Batch prediction feature is excluded from this phase. Please use manual input for now.")
             except Exception as e:
                 st.error(f"❌ Error reading file: {e}")
 
-def train_models_page():
-    """Display model training page."""
-    st.title("🧠 Model Training & Comparison")
-    st.markdown("Compare performance of different ML models for RUL prediction.")
-    
-    # Dataset info
-    if 'df' in st.session_state:
-        df = st.session_state.df
-        battery_ids = df['battery_id'].unique() if 'battery_id' in df.columns else []
-        st.info(f"📊 **Dataset**: NASA Battery Dataset | **Samples**: {len(df)} | **Batteries**: {len(battery_ids)} ({', '.join(sorted(battery_ids)[:5])}{'...' if len(battery_ids) > 5 else ''})")
-    
-    # Display current metrics
-    if st.session_state.models_trained:
-        st.markdown("### 📊 Current Model Performance")
-        
-        # Metrics table
-        metrics_df = create_metrics_table(st.session_state.metrics)
-        st.dataframe(metrics_df, use_container_width=True)
-        
-        # Visualizations
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.plotly_chart(
-                plot_model_comparison(st.session_state.metrics),
-                use_container_width=True
-            )
-        
-        with col2:
-            st.plotly_chart(
-                plot_r2_comparison(st.session_state.metrics),
-                use_container_width=True
-            )
-        
-        # Best model
-        best_model = min(st.session_state.metrics.items(), key=lambda x: x[1]['MAE'])
-        st.success(f"🏆 Best Model: **{best_model[0]}** (MAE: {best_model[1]['MAE']:.2f} cycles)")
-    
-    st.markdown("---")
-    
-    # Retrain option
-    st.markdown("### 🔄 Retrain Models")
-    st.info("Retrain all models on the current dataset. This may take several minutes.")
-    
-    if st.button("🚀 Retrain All Models", use_container_width=True, type="primary"):
-        with st.spinner("⏳ Training models... Please wait."):
-            try:
-                from sklearn.model_selection import train_test_split
-                X_train, X_test, y_train, y_test = train_test_split(
-                    st.session_state.X, st.session_state.y,
-                    test_size=0.2, random_state=42
-                )
-                
-                models, metrics = train_all_models(X_train, y_train, X_test, y_test)
-                
-                st.session_state.models = models
-                st.session_state.metrics = metrics
-                
-                st.success("✅ Models retrained successfully!")
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"❌ Training failed: {e}")
-                logger.error(f"Training error: {e}")
 
 def what_if_page():
-    """Display what-if analysis page."""
+    """Display what-if analysis page - uses backend API for predictions."""
     st.title("🔬 What-If Scenario Analysis")
     st.markdown("Explore how changing battery parameters affects the predicted RUL.")
+    
+    # Check backend status
+    health = check_backend_health()
+    if health.get('status') != 'healthy':
+        st.error(f"⚠️ Backend service unavailable: {health.get('error', 'Unknown error')}")
+        return
     
     # Base parameters
     st.markdown("### 🎯 Base Scenario")
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        base_temp = st.number_input("Temperature (°C)", 20, 50, 35)
+        base_temp = st.number_input("Temperature (°C)", 0, 70, 35)
     with col2:
-        base_voltage = st.number_input("Voltage (V)", 3.0, 4.5, 3.7)
+        base_voltage = st.number_input("Voltage (V)", 2.0, 4.5, 3.7, 0.1)
     with col3:
-        base_current = st.number_input("Current (A)", -2.0, 2.0, 1.0)
+        base_current = st.number_input("Current (A)", -2.0, 0.0, -1.0, 0.1)
     
-    base_cycle = st.number_input("Cycle Count", 0, 2000, 500)
-    base_capacity = st.number_input("Capacity (Ah)", 1.0, 2.5, 1.8)
+    col1, col2 = st.columns(2)
+    with col1:
+        base_cycle = st.number_input("Cycle Count", 0, 500, 50)
+    with col2:
+        base_capacity = st.number_input("Capacity (Ah)", 0.5, 2.5, 1.8, 0.1)
     
     # Calculate base RUL
     if st.button("📊 Run Analysis", use_container_width=True, type="primary"):
-        with st.spinner("🔮 Running simulations..."):
-            try:
-                # Base prediction
-                base_features = create_user_input_features(
-                    base_voltage, base_current, base_temp, base_cycle, base_capacity
-                )
-                
-                for col in st.session_state.feature_names:
-                    if col not in base_features.columns:
-                        base_features[col] = 0
-                
-                base_features = base_features[st.session_state.feature_names]
-                base_features_scaled = pd.DataFrame(
-                    st.session_state.scaler.transform(base_features),
-                    columns=base_features.columns
-                )
-                
-                model = st.session_state.models['XGBoost']
-                base_rul = predict_rul(model, base_features_scaled, 'XGBoost')
-                
-                st.success(f"✅ Base RUL: **{base_rul:.0f} cycles**")
-                
-                # What-if scenarios
-                st.markdown("### 🔄 Scenario Comparisons")
-                
-                scenarios = {}
-                
-                # Temperature scenarios
-                temp_lower = create_user_input_features(
-                    base_voltage, base_current, base_temp - 5, base_cycle, base_capacity
-                )
-                temp_lower = temp_lower[st.session_state.feature_names]
-                temp_lower_scaled = pd.DataFrame(
-                    st.session_state.scaler.transform(temp_lower),
-                    columns=temp_lower.columns
-                )
-                scenarios['Temp -5°C'] = predict_rul(model, temp_lower_scaled, 'XGBoost')
-                
-                temp_higher = create_user_input_features(
-                    base_voltage, base_current, base_temp + 5, base_cycle, base_capacity
-                )
-                temp_higher = temp_higher[st.session_state.feature_names]
-                temp_higher_scaled = pd.DataFrame(
-                    st.session_state.scaler.transform(temp_higher),
-                    columns=temp_higher.columns
-                )
-                scenarios['Temp +5°C'] = predict_rul(model, temp_higher_scaled, 'XGBoost')
-                
-                # Current scenarios
-                current_lower = create_user_input_features(
-                    base_voltage, base_current - 0.5, base_temp, base_cycle, base_capacity
-                )
-                current_lower = current_lower[st.session_state.feature_names]
-                current_lower_scaled = pd.DataFrame(
-                    st.session_state.scaler.transform(current_lower),
-                    columns=current_lower.columns
-                )
-                scenarios['Current -0.5A'] = predict_rul(model, current_lower_scaled, 'XGBoost')
-                
-                current_higher = create_user_input_features(
-                    base_voltage, base_current + 0.5, base_temp, base_cycle, base_capacity
-                )
-                current_higher = current_higher[st.session_state.feature_names]
-                current_higher_scaled = pd.DataFrame(
-                    st.session_state.scaler.transform(current_higher),
-                    columns=current_higher.columns
-                )
-                scenarios['Current +0.5A'] = predict_rul(model, current_higher_scaled, 'XGBoost')
-                
+        with st.spinner("🔮 Running simulations via API..."):
+            # Base prediction
+            base_result = predict_rul_via_api(
+                base_voltage, base_current, base_temp, base_cycle, base_capacity, "XGBoost"
+            )
+            
+            if not base_result['success']:
+                display_api_error(base_result)
+                return
+            
+            base_rul = base_result['data']['predicted_rul_cycles']
+            st.success(f"✅ Base RUL: **{base_rul} cycles** ({base_result['data']['battery_health']})")
+            
+            # What-if scenarios
+            st.markdown("### 🔄 Scenario Comparisons")
+            
+            scenarios = {}
+            scenario_configs = [
+                ("Temp -5°C", base_voltage, base_current, base_temp - 5, base_cycle, base_capacity),
+                ("Temp +5°C", base_voltage, base_current, base_temp + 5, base_cycle, base_capacity),
+                ("Current -0.3A", base_voltage, base_current - 0.3, base_temp, base_cycle, base_capacity),
+                ("Current +0.3A", base_voltage, min(0, base_current + 0.3), base_temp, base_cycle, base_capacity),
+                ("Capacity +0.1Ah", base_voltage, base_current, base_temp, base_cycle, min(2.5, base_capacity + 0.1)),
+                ("Capacity -0.1Ah", base_voltage, base_current, base_temp, base_cycle, max(0.5, base_capacity - 0.1)),
+            ]
+            
+            progress_bar = st.progress(0)
+            for i, (name, v, c, t, cy, cap) in enumerate(scenario_configs):
+                result = predict_rul_via_api(v, c, t, cy, cap, "XGBoost")
+                if result['success']:
+                    scenarios[name] = result['data']['predicted_rul_cycles']
+                progress_bar.progress((i + 1) / len(scenario_configs))
+            
+            progress_bar.empty()
+            
+            if scenarios:
                 # Display comparison
                 st.plotly_chart(
                     plot_what_if_comparison(base_rul, scenarios),
@@ -551,25 +671,65 @@ def what_if_page():
                 
                 # Recommendations
                 st.markdown("### 💡 Recommendations")
-                best_scenario = max(scenarios.items(), key=lambda x: x[1])
-                st.info(f"🏆 Best scenario: **{best_scenario[0]}** improves RUL by **{best_scenario[1] - base_rul:.0f} cycles**")
                 
+                best_scenario = max(scenarios.items(), key=lambda x: x[1])
+                worst_scenario = min(scenarios.items(), key=lambda x: x[1])
+                
+                if best_scenario[1] > base_rul:
+                    improvement = best_scenario[1] - base_rul
+                    st.success(f"🏆 Best scenario: **{best_scenario[0]}** improves RUL by **{improvement} cycles**")
+                
+                if worst_scenario[1] < base_rul:
+                    degradation = base_rul - worst_scenario[1]
+                    st.warning(f"⚠️ Worst scenario: **{worst_scenario[0]}** reduces RUL by **{degradation} cycles**")
+                
+                # Specific recommendations
                 recommendations = []
-                if scenarios['Temp -5°C'] > base_rul:
-                    recommendations.append("🌡️ Reducing temperature by 5°C can extend battery life")
-                if scenarios['Current -0.5A'] > base_rul:
-                    recommendations.append("⚡ Reducing charge/discharge current improves longevity")
+                if scenarios.get('Temp -5°C', 0) > base_rul:
+                    recommendations.append("🌡️ Reducing operating temperature can extend battery life")
+                if scenarios.get('Current -0.3A', 0) > base_rul:
+                    recommendations.append("⚡ Lower discharge current improves longevity")
                 
                 for rec in recommendations:
-                    st.success(rec)
-                    
-            except Exception as e:
-                st.error(f"❌ Analysis failed: {e}")
-                logger.error(f"What-if error: {e}")
+                    st.info(rec)
+            else:
+                st.error("❌ Failed to run scenario simulations")
+
 
 def about_page():
     """Display about page."""
     st.title("ℹ️ About")
+    
+    # Backend architecture info
+    with st.expander("🏗️ System Architecture", expanded=True):
+        st.markdown("""
+        ### Client-Server Architecture
+        
+        This application uses a **decoupled architecture**:
+        
+        - **Frontend (Streamlit)**: User interface and visualization
+        - **Backend (FastAPI)**: ML inference and business logic
+        
+        ```
+        ┌─────────────┐     HTTP/REST      ┌─────────────┐
+        │  Streamlit  │ ◄───────────────► │   FastAPI   │
+        │  Frontend   │    /api/predict    │   Backend   │
+        └─────────────┘                    └─────────────┘
+                                                  │
+                                                  ▼
+                                          ┌─────────────┐
+                                          │  ML Models  │
+                                          │ (XGB, RF,   │
+                                          │  LR, LSTM)  │
+                                          └─────────────┘
+        ```
+        
+        **Benefits:**
+        - 🔄 Independent scaling of frontend and backend
+        - 🔌 Backend can serve multiple clients (web, mobile, API)
+        - 🛡️ Centralized ML logic and model versioning
+        - 🚀 Easier deployment and maintenance
+        """)
     
     st.markdown("""
     ## 🔋 Battery RUL Prediction System
@@ -588,8 +748,7 @@ def about_page():
     
     ### 📊 Features
     
-    - Real-time RUL prediction
-    - Model explainability using SHAP
+    - Real-time RUL prediction via REST API
     - What-if scenario analysis
     - Sustainability impact tracking
     - CSV/PDF report generation
@@ -608,21 +767,20 @@ def about_page():
     This system uses the NASA Randomized Battery Usage Dataset, which contains real-world battery 
     degradation data from controlled experiments.
     
-    ### 👥 Credits
+    ### 🔗 API Endpoints
     
-    Developed as a demonstration of AI-powered predictive maintenance for sustainable transportation.
-    
-    ### 🔗 Resources
-    
-    - [NASA Dataset](https://data.nasa.gov/)
-    - [Streamlit](https://streamlit.io/)
-    - [SHAP Documentation](https://shap.readthedocs.io/)
+    | Endpoint | Method | Description |
+    |----------|--------|-------------|
+    | `/api/health` | GET | Health check and model status |
+    | `/api/models` | GET | List available models |
+    | `/api/predict` | POST | Make RUL prediction |
     
     ---
     
-    **Version**: 1.0.0  
+    **Version**: 2.0.0 (Decoupled Architecture)  
     **Last Updated**: 2025
     """)
+
 
 def main():
     """Main application logic."""
@@ -636,12 +794,19 @@ def main():
         st.markdown(f"### 👤 Welcome, {st.session_state.username}!")
         st.markdown("---")
         
+        # Backend status indicator
+        health = check_backend_health()
+        if health.get('status') == 'healthy':
+            st.success("🟢 Backend Online")
+        else:
+            st.error("🔴 Backend Offline")
+        
+        st.markdown("---")
         st.markdown("### 🧭 Navigation")
         
         pages = {
             "🏠 Home": "Home",
             "📈 Predict RUL": "Predict RUL",
-            "🧠 Train Models": "Train Models",
             "🔬 What-If Analysis": "What-If",
             "ℹ️ About": "About"
         }
@@ -656,23 +821,16 @@ def main():
         if st.button("🚪 Logout", use_container_width=True):
             logout()
     
-    # Load data and models
-    if st.session_state.current_page != "Home" and st.session_state.current_page != "About":
-        if not load_data_and_models():
-            st.error("Failed to initialize system. Please refresh the page.")
-            return
-    
     # Route to appropriate page
     if st.session_state.current_page == "Home":
         home_page()
     elif st.session_state.current_page == "Predict RUL":
         predict_rul_page()
-    elif st.session_state.current_page == "Train Models":
-        train_models_page()
     elif st.session_state.current_page == "What-If":
         what_if_page()
     elif st.session_state.current_page == "About":
         about_page()
+
 
 if __name__ == "__main__":
     main()

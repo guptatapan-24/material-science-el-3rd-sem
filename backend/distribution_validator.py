@@ -1,6 +1,8 @@
 """
 Distribution Validator for Battery RUL Prediction System
 Implements Out-of-Distribution (OOD) detection and prediction explanation logic
+
+Phase 3.5: Enhanced with multi-dataset awareness (NASA, CALCE, Oxford, MATR1)
 """
 import logging
 from typing import Dict, Any, Optional, List, Tuple
@@ -8,6 +10,12 @@ from enum import Enum
 from dataclasses import dataclass
 
 from dataset_statistics import get_statistics_generator
+from multi_dataset_statistics import (
+    get_multi_dataset_manager,
+    analyze_input_cross_dataset,
+    DatasetSource,
+    CrossDatasetConfidence
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

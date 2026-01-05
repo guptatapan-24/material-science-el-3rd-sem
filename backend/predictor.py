@@ -57,7 +57,13 @@ class BatteryPredictor:
         self._load_or_create_scaler()
     
     def _load_models(self) -> None:
-        """Load pre-trained models from disk."""
+        """Load pre-trained models from disk or train new ones.
+        
+        On startup:
+        1. Check if models exist
+        2. Validate feature order matches FEATURE_COLUMNS
+        3. If invalid or missing, retrain automatically
+        """
         model_files = {
             'Linear Regression': 'linear_regression.pkl',
             'Random Forest': 'random_forest.pkl',
@@ -66,6 +72,7 @@ class BatteryPredictor:
         
         os.makedirs(MODELS_DIR, exist_ok=True)
         
+        # Try loading existing models
         for name, filename in model_files.items():
             filepath = os.path.join(MODELS_DIR, filename)
             if os.path.exists(filepath):
@@ -85,13 +92,74 @@ class BatteryPredictor:
             except Exception as e:
                 logger.warning(f"Failed to load LSTM: {e}")
         
-        # If no models loaded, train default models
-        if not self.models:
-            logger.info("No pre-trained models found. Training default models...")
+        # Validate models have correct feature order
+        needs_retrain = False
+        if self.models:
+            needs_retrain = not self._validate_model_features()
+        
+        # If no models or invalid features, train fresh models
+        if not self.models or needs_retrain:
+            if needs_retrain:
+                logger.warning("Model feature order mismatch detected. Retraining models...")
+                self._clear_old_models()
+            else:
+                logger.info("No pre-trained models found. Training default models...")
             self._train_default_models()
         
         self._models_loaded = len(self.models) > 0
-        logger.info(f"Models loaded: {list(self.models.keys())}")
+        logger.info(f"Models ready: {list(self.models.keys())}")
+    
+    def _validate_model_features(self) -> bool:
+        """Validate that loaded models have correct feature order.
+        
+        Returns:
+            True if features match FEATURE_COLUMNS, False otherwise
+        """
+        try:
+            # Check XGBoost model (has feature_names_ attribute)
+            if 'XGBoost' in self.models:
+                xgb_model = self.models['XGBoost']
+                if hasattr(xgb_model, 'feature_names_in_'):
+                    model_features = list(xgb_model.feature_names_in_)
+                    if model_features != self.feature_names:
+                        logger.warning(f"XGBoost feature mismatch!")
+                        logger.warning(f"Expected: {self.feature_names[:5]}...")
+                        logger.warning(f"Got: {model_features[:5]}...")
+                        return False
+            
+            # Check Random Forest model
+            if 'Random Forest' in self.models:
+                rf_model = self.models['Random Forest']
+                if hasattr(rf_model, 'feature_names_in_'):
+                    model_features = list(rf_model.feature_names_in_)
+                    if model_features != self.feature_names:
+                        logger.warning(f"Random Forest feature mismatch!")
+                        return False
+            
+            logger.info("Model feature validation passed")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Feature validation error: {e}")
+            return False
+    
+    def _clear_old_models(self) -> None:
+        """Clear old model files before retraining."""
+        self.models = {}
+        files_to_remove = [
+            'linear_regression.pkl',
+            'random_forest.pkl', 
+            'xgboost.pkl',
+            'scaler.pkl'
+        ]
+        for filename in files_to_remove:
+            filepath = os.path.join(MODELS_DIR, filename)
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                    logger.info(f"Removed old model: {filename}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove {filename}: {e}")
     
     def _load_or_create_scaler(self) -> None:
         """Load or create a feature scaler."""

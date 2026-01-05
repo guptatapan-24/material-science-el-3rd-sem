@@ -216,7 +216,11 @@ class BatteryPredictor:
             raise
     
     def _generate_training_data(self) -> Tuple[pd.DataFrame, pd.Series]:
-        """Generate synthetic training data for model initialization."""
+        """Generate synthetic training data for model initialization.
+        
+        Features are created in the exact order specified by FEATURE_COLUMNS
+        to ensure consistency with model training.
+        """
         np.random.seed(42)
         n_samples = 2000
         
@@ -225,8 +229,8 @@ class BatteryPredictor:
             cycle = np.random.randint(1, 200)
             initial_capacity = 2.0
             # Simulate degradation
-            capacity_fade = 0.004 * cycle + np.random.normal(0, 0.02)
-            capacity = max(1.2, initial_capacity - capacity_fade)
+            capacity_fade_val = 0.004 * cycle + np.random.normal(0, 0.02)
+            capacity = max(1.2, initial_capacity - capacity_fade_val)
             capacity_ratio = capacity / initial_capacity
             
             # Calculate RUL based on degradation
@@ -236,17 +240,9 @@ class BatteryPredictor:
             else:
                 rul = 0
             
+            # Create sample in EXACT order of FEATURE_COLUMNS
             sample = {
                 'cycle': cycle,
-                'cycle_normalized': cycle / 200.0,
-                'capacity': capacity,
-                'initial_capacity': initial_capacity,
-                'capacity_fade': initial_capacity - capacity,
-                'capacity_ratio': capacity_ratio,
-                'soh': capacity_ratio * 100,
-                'ambient_temperature': 25 + np.random.normal(0, 5),
-                'Re': 0.055 + cycle * 0.00015,
-                'Rct': 0.18 + cycle * 0.0003,
                 'voltage_mean': 3.5 + np.random.normal(0, 0.2),
                 'voltage_std': 0.35,
                 'voltage_min': 2.7,
@@ -270,11 +266,21 @@ class BatteryPredictor:
                 'power_mean': 3.5,
                 'power_max': 4.2,
                 'energy': 10000 * capacity_ratio,
+                'capacity': capacity,
+                'initial_capacity': initial_capacity,
+                'capacity_fade': initial_capacity - capacity,
+                'capacity_ratio': capacity_ratio,
+                'ambient_temperature': 25 + np.random.normal(0, 5),
+                'Re': 0.055 + cycle * 0.00015,
+                'Rct': 0.18 + cycle * 0.0003,
+                'soh': capacity_ratio * 100,
+                'cycle_normalized': cycle / 200.0,
                 'rul': max(0, rul)
             }
             data.append(sample)
         
         df = pd.DataFrame(data)
+        # Ensure correct column ordering
         X = df[self.feature_names]
         y = df['rul']
         

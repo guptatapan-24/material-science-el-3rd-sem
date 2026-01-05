@@ -1,9 +1,10 @@
 """
 Pydantic schemas for Battery RUL Prediction API
 Defines request/response models with validation rules
+Phase 3: Extended with distribution validation and batch prediction support
 """
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 
 
@@ -19,6 +20,19 @@ class ConfidenceLevel(str, Enum):
     HIGH = "High"
     MEDIUM = "Medium"
     LOW = "Low"
+
+
+class DistributionStatus(str, Enum):
+    """Distribution status relative to training data."""
+    IN_DISTRIBUTION = "in_distribution"
+    OUT_OF_DISTRIBUTION = "out_of_distribution"
+
+
+class LifeStageContext(str, Enum):
+    """Battery life stage classification."""
+    EARLY_LIFE = "early_life"
+    MID_LIFE = "mid_life"
+    LATE_LIFE = "late_life"
 
 
 class PredictionRequest(BaseModel):
@@ -108,7 +122,10 @@ class PredictionRequest(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    """Response schema for battery RUL prediction."""
+    """Response schema for battery RUL prediction.
+    
+    Phase 3 Enhanced: Includes distribution validation and confidence explanation.
+    """
     predicted_rul_cycles: int = Field(
         ...,
         description="Predicted Remaining Useful Life in cycles"
@@ -125,6 +142,23 @@ class PredictionResponse(BaseModel):
         ...,
         description="ML model used for prediction"
     )
+    # Phase 3: New fields for distribution validation
+    distribution_status: DistributionStatus = Field(
+        default=DistributionStatus.IN_DISTRIBUTION,
+        description="Whether input is within training data distribution"
+    )
+    life_stage_context: LifeStageContext = Field(
+        default=LifeStageContext.MID_LIFE,
+        description="Inferred battery life stage based on input parameters"
+    )
+    confidence_explanation: str = Field(
+        default="",
+        description="Detailed explanation of confidence level and prediction context"
+    )
+    inference_warning: Optional[str] = Field(
+        default=None,
+        description="Warning message if input is unusual or OOD"
+    )
 
     class Config:
         json_schema_extra = {
@@ -132,7 +166,96 @@ class PredictionResponse(BaseModel):
                 "predicted_rul_cycles": 350,
                 "battery_health": "Moderate",
                 "confidence_level": "High",
-                "model_used": "XGBoost"
+                "model_used": "XGBoost",
+                "distribution_status": "in_distribution",
+                "life_stage_context": "mid_life",
+                "confidence_explanation": "Prediction has high confidence. Input parameters are consistent with NASA training dataset characteristics.",
+                "inference_warning": None
+            }
+        }
+
+
+class BatchPredictionRow(BaseModel):
+    """Single row result from batch prediction."""
+    row_index: int = Field(..., description="Original row index in CSV")
+    predicted_rul_cycles: int = Field(..., description="Predicted RUL in cycles")
+    battery_health: str = Field(..., description="Health classification")
+    distribution_status: str = Field(..., description="Distribution status")
+    life_stage_context: str = Field(..., description="Life stage")
+    confidence_level: str = Field(..., description="Confidence level")
+    inference_warning: Optional[str] = Field(None, description="Warning if any")
+    error: Optional[str] = Field(None, description="Error message if prediction failed")
+
+
+class BatchPredictionResponse(BaseModel):
+    """Response schema for batch prediction endpoint."""
+    success: bool = Field(..., description="Whether batch prediction was successful")
+    total_rows: int = Field(..., description="Total rows in input CSV")
+    processed_rows: int = Field(..., description="Number of rows successfully processed")
+    failed_rows: int = Field(..., description="Number of rows that failed")
+    results: List[BatchPredictionRow] = Field(..., description="Per-row prediction results")
+    summary: dict = Field(default_factory=dict, description="Summary statistics")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "total_rows": 10,
+                "processed_rows": 9,
+                "failed_rows": 1,
+                "results": [
+                    {
+                        "row_index": 0,
+                        "predicted_rul_cycles": 120,
+                        "battery_health": "Moderate",
+                        "distribution_status": "in_distribution",
+                        "life_stage_context": "mid_life",
+                        "confidence_level": "High",
+                        "inference_warning": None,
+                        "error": None
+                    }
+                ],
+                "summary": {
+                    "avg_rul": 115,
+                    "healthy_count": 3,
+                    "moderate_count": 5,
+                    "critical_count": 1,
+                    "ood_count": 2
+                }
+            }
+        }
+
+
+class DatasetStatisticsResponse(BaseModel):
+    """Response schema for dataset statistics endpoint."""
+    metadata: dict = Field(..., description="Dataset metadata")
+    features: dict = Field(..., description="Per-feature statistics")
+    dataset_context: dict = Field(..., description="Context about dataset bias and characteristics")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "metadata": {
+                    "dataset_source": "NASA Li-ion Battery Aging Dataset",
+                    "total_samples": 1500,
+                    "batteries_analyzed": 11
+                },
+                "features": {
+                    "cycle": {
+                        "minimum": 1,
+                        "maximum": 168,
+                        "mean": 85,
+                        "median": 84,
+                        "standard_deviation": 48,
+                        "percentile_5": 9,
+                        "percentile_95": 160
+                    }
+                },
+                "dataset_context": {
+                    "late_life_bias": True,
+                    "cycle_range_dominant": "50-170 cycles",
+                    "eol_threshold": 0.8
+                }
             }
         }
 

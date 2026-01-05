@@ -779,7 +779,10 @@ def predict_rul_page():
                         'distribution_status': data.get('distribution_status', 'unknown'),
                         'life_stage_context': data.get('life_stage_context', 'unknown'),
                         'confidence_explanation': data.get('confidence_explanation', ''),
-                        'inference_warning': data.get('inference_warning', '')
+                        'inference_warning': data.get('inference_warning', ''),
+                        'dominant_dataset': data.get('dominant_dataset', 'NASA'),
+                        'cross_dataset_confidence': data.get('cross_dataset_confidence', 'medium'),
+                        'dataset_coverage_note': data.get('dataset_coverage_note', '')
                     }
                     
                     with col1:

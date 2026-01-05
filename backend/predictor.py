@@ -119,21 +119,17 @@ class BatteryPredictor:
             logger.warning(f"Failed to save scaler: {e}")
     
     def _create_dummy_training_data(self) -> pd.DataFrame:
-        """Create dummy data for scaler fitting."""
+        """Create dummy data for scaler fitting.
+        
+        Features are created in the exact order specified by FEATURE_COLUMNS
+        to ensure consistency with model training.
+        """
         np.random.seed(42)
         n_samples = 1000
         
+        # Create data in the EXACT order of FEATURE_COLUMNS
         data = {
             'cycle': np.random.randint(1, 200, n_samples),
-            'cycle_normalized': np.random.uniform(0, 1, n_samples),
-            'capacity': np.random.uniform(1.2, 2.0, n_samples),
-            'initial_capacity': np.full(n_samples, 2.0),
-            'capacity_fade': np.random.uniform(0, 0.8, n_samples),
-            'capacity_ratio': np.random.uniform(0.6, 1.0, n_samples),
-            'soh': np.random.uniform(60, 100, n_samples),
-            'ambient_temperature': np.random.uniform(20, 40, n_samples),
-            'Re': np.random.uniform(0.05, 0.15, n_samples),
-            'Rct': np.random.uniform(0.15, 0.35, n_samples),
             'voltage_mean': np.random.uniform(3.0, 4.0, n_samples),
             'voltage_std': np.random.uniform(0.1, 0.5, n_samples),
             'voltage_min': np.random.uniform(2.5, 3.5, n_samples),
@@ -157,9 +153,20 @@ class BatteryPredictor:
             'power_mean': np.random.uniform(2, 8, n_samples),
             'power_max': np.random.uniform(4, 10, n_samples),
             'energy': np.random.uniform(5000, 15000, n_samples),
+            'capacity': np.random.uniform(1.2, 2.0, n_samples),
+            'initial_capacity': np.full(n_samples, 2.0),
+            'capacity_fade': np.random.uniform(0, 0.8, n_samples),
+            'capacity_ratio': np.random.uniform(0.6, 1.0, n_samples),
+            'ambient_temperature': np.random.uniform(20, 40, n_samples),
+            'Re': np.random.uniform(0.05, 0.15, n_samples),
+            'Rct': np.random.uniform(0.15, 0.35, n_samples),
+            'soh': np.random.uniform(60, 100, n_samples),
+            'cycle_normalized': np.random.uniform(0, 1, n_samples),
         }
         
-        return pd.DataFrame(data)[self.feature_names]
+        # Create DataFrame with explicit column ordering
+        df = pd.DataFrame(data)
+        return df[self.feature_names]
     
     def _train_default_models(self) -> None:
         """Train default models if none are available."""

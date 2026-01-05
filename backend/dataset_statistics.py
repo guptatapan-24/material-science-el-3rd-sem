@@ -331,9 +331,9 @@ class DatasetStatisticsGenerator:
                 },
                 'voltage_measured': {
                     'minimum': 2.5, 'maximum': 4.2, 'mean': 3.52, 'median': 3.55,
-                    'standard_deviation': 0.35, 'percentile_5': 2.9, 'percentile_25': 3.25,
-                    'percentile_75': 3.75, 'percentile_95': 4.1, 'count': 1500,
-                    'description': 'Measured voltage in V'
+                    'standard_deviation': 0.35, 'percentile_5': 2.7, 'percentile_25': 3.25,
+                    'percentile_75': 3.85, 'percentile_95': 4.15, 'count': 1500,
+                    'description': 'Measured voltage in V (instantaneous)'
                 },
                 'temperature_measured': {
                     'minimum': 18, 'maximum': 45, 'mean': 28, 'median': 27,

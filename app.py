@@ -371,6 +371,24 @@ def get_confidence_badge(confidence: str) -> str:
         return f'<span class="confidence-low">? {confidence}</span>'
 
 
+def get_distribution_badge(status: str) -> str:
+    """Get HTML badge for distribution status."""
+    if status == 'in_distribution':
+        return '<span class="dist-in">✓ In Distribution</span>'
+    else:
+        return '<span class="dist-out">⚠️ Out of Distribution</span>'
+
+
+def get_life_stage_badge(stage: str) -> str:
+    """Get HTML badge for life stage context."""
+    if stage == 'early_life':
+        return '<span class="stage-early">🌱 Early Life</span>'
+    elif stage == 'mid_life':
+        return '<span class="stage-mid">🔋 Mid Life</span>'
+    else:
+        return '<span class="stage-late">🔻 Late Life</span>'
+
+
 # ============================================================================
 # PAGE FUNCTIONS
 # ============================================================================

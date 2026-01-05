@@ -316,27 +316,27 @@ class DatasetStatisticsGenerator:
                     'description': 'Charge-discharge cycle number'
                 },
                 'capacity': {
-                    'minimum': 1.1, 'maximum': 2.0, 'mean': 1.45, 'median': 1.4,
-                    'standard_deviation': 0.22, 'percentile_5': 1.15, 'percentile_25': 1.28,
-                    'percentile_75': 1.62, 'percentile_95': 1.85, 'count': 1500,
+                    'minimum': 0.6, 'maximum': 2.0, 'mean': 1.45, 'median': 1.47,
+                    'standard_deviation': 0.28, 'percentile_5': 0.77, 'percentile_25': 1.32,
+                    'percentile_75': 1.65, 'percentile_95': 1.86, 'count': 1500,
                     'description': 'Battery capacity in Ah'
                 },
                 'voltage_measured': {
-                    'minimum': 2.5, 'maximum': 4.2, 'mean': 3.5, 'median': 3.5,
-                    'standard_deviation': 0.35, 'percentile_5': 2.8, 'percentile_25': 3.2,
-                    'percentile_75': 3.8, 'percentile_95': 4.1, 'count': 1500,
+                    'minimum': 2.5, 'maximum': 4.2, 'mean': 3.52, 'median': 3.55,
+                    'standard_deviation': 0.35, 'percentile_5': 2.9, 'percentile_25': 3.25,
+                    'percentile_75': 3.75, 'percentile_95': 4.1, 'count': 1500,
                     'description': 'Measured voltage in V'
                 },
                 'temperature_measured': {
-                    'minimum': 4, 'maximum': 44, 'mean': 24, 'median': 24,
-                    'standard_deviation': 8, 'percentile_5': 4, 'percentile_25': 20,
-                    'percentile_75': 28, 'percentile_95': 40, 'count': 1500,
+                    'minimum': 18, 'maximum': 45, 'mean': 28, 'median': 27,
+                    'standard_deviation': 6, 'percentile_5': 20, 'percentile_25': 24,
+                    'percentile_75': 33, 'percentile_95': 42, 'count': 1500,
                     'description': 'Temperature in °C'
                 },
                 'current_measured': {
-                    'minimum': -2.0, 'maximum': 0.0, 'mean': -1.0, 'median': -1.0,
-                    'standard_deviation': 0.3, 'percentile_5': -1.8, 'percentile_25': -1.2,
-                    'percentile_75': -0.8, 'percentile_95': -0.2, 'count': 1500,
+                    'minimum': -2.2, 'maximum': -0.5, 'mean': -1.5, 'median': -1.4,
+                    'standard_deviation': 0.4, 'percentile_5': -2.1, 'percentile_25': -1.8,
+                    'percentile_75': -1.1, 'percentile_95': -0.7, 'count': 1500,
                     'description': 'Current in A'
                 }
             },
@@ -346,7 +346,7 @@ class DatasetStatisticsGenerator:
                 'capacity_range_dominant': '1.2-1.8 Ah',
                 'eol_threshold': 0.8,
                 'initial_capacity_nominal': 2.0,
-                'note': 'NASA dataset focuses on aging-phase electrochemical behavior.'
+                'note': 'NASA dataset focuses on aging-phase electrochemical behavior. Early-life batteries may receive conservative predictions.'
             }
         }
         self._save_statistics()

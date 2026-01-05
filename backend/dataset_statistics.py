@@ -94,7 +94,10 @@ class DatasetStatisticsGenerator:
             raise
     
     def _process_nasa_metadata(self) -> Optional[pd.DataFrame]:
-        """Process NASA metadata to extract training statistics."""
+        """Process NASA metadata to extract training statistics.
+        
+        Extracts actual voltage, current, and temperature distributions from cycle files.
+        """
         try:
             metadata = pd.read_csv(METADATA_PATH)
             
@@ -117,32 +120,62 @@ class DatasetStatisticsGenerator:
             discharge_df = discharge_df.sort_values(['battery_id', 'test_id'])
             discharge_df['cycle'] = discharge_df.groupby('battery_id').cumcount() + 1
             
-            # Extract features from cycle data files (sample some for statistics)
-            voltage_means = []
-            current_means = []
-            temp_means = []
+            # Extract per-cycle features from cycle data files
+            # Store actual values for proper distribution computation
+            voltage_values = []
+            current_values = []
+            temp_values = []
             
-            for _, row in discharge_df.head(200).iterrows():  # Sample for efficiency
+            # Sample cycle files for statistics
+            sample_rows = discharge_df.sample(n=min(300, len(discharge_df)), random_state=42)
+            
+            for _, row in sample_rows.iterrows():
                 filename = row['filename']
                 cycle_path = DATA_FOLDER_PATH / filename
                 if cycle_path.exists():
                     try:
                         cycle_data = pd.read_csv(cycle_path)
                         if 'Voltage_measured' in cycle_data.columns:
-                            voltage_means.append(cycle_data['Voltage_measured'].mean())
+                            # Store mean voltage for this cycle
+                            voltage_values.append(cycle_data['Voltage_measured'].mean())
                         if 'Current_measured' in cycle_data.columns:
-                            current_means.append(cycle_data['Current_measured'].mean())
+                            # Store mean current for this cycle
+                            current_values.append(cycle_data['Current_measured'].mean())
                         if 'Temperature_measured' in cycle_data.columns:
-                            temp_means.append(cycle_data['Temperature_measured'].mean())
+                            # Store mean temperature for this cycle
+                            temp_values.append(cycle_data['Temperature_measured'].mean())
                     except:
                         pass
             
-            # Add aggregated features
-            discharge_df['voltage_mean'] = np.mean(voltage_means) if voltage_means else 3.5
-            discharge_df['current_mean'] = np.mean(current_means) if current_means else -1.0
-            discharge_df['temp_mean'] = np.mean(temp_means) if temp_means else 30.0
+            # Assign per-row values (distributing sampled values)
+            n_rows = len(discharge_df)
+            
+            if voltage_values:
+                # Replicate sampled values to match dataframe size
+                voltage_extended = np.resize(voltage_values, n_rows)
+                discharge_df['voltage_mean'] = voltage_extended
+            else:
+                discharge_df['voltage_mean'] = 3.5
+                
+            if current_values:
+                current_extended = np.resize(current_values, n_rows)
+                discharge_df['current_mean'] = current_extended
+            else:
+                discharge_df['current_mean'] = -1.0
+                
+            if temp_values:
+                temp_extended = np.resize(temp_values, n_rows)
+                discharge_df['temp_mean'] = temp_extended
+            else:
+                discharge_df['temp_mean'] = 30.0
+            
+            # Store sampled values for direct statistics computation
+            self._sampled_voltage = voltage_values
+            self._sampled_current = current_values
+            self._sampled_temperature = temp_values
             
             logger.info(f"Processed NASA metadata: {len(discharge_df)} discharge cycles")
+            logger.info(f"Sampled {len(voltage_values)} cycles for voltage/current/temp statistics")
             return discharge_df
             
         except Exception as e:

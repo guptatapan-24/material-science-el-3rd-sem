@@ -186,6 +186,62 @@ class BatteryPredictor:
         self._models_loaded = len(self.models) > 0
         logger.info(f"Models ready: {list(self.models.keys())}")
     
+    def _load_versioned_models(self) -> None:
+        """Load versioned models (v1 baseline and v2 physics-augmented)."""
+        # V2 Physics-Augmented Models
+        v2_model_files = {
+            'XGBoost': 'xgboost_v2_physics_augmented.pkl',
+            'Random Forest': 'random_forest_v2_physics_augmented.pkl',
+            'Linear Regression': 'linear_regression_v2_physics_augmented.pkl',
+        }
+        
+        # V1 NASA-only Baseline Models
+        v1_model_files = {
+            'XGBoost': 'xgboost_v1_nasa.pkl',
+            'Random Forest': 'random_forest_v1_nasa.pkl',
+            'Linear Regression': 'linear_regression_v1_nasa.pkl',
+        }
+        
+        # Load v2 models
+        for name, filename in v2_model_files.items():
+            filepath = os.path.join(MODELS_DIR, filename)
+            if os.path.exists(filepath):
+                try:
+                    self.v2_models[name] = joblib.load(filepath)
+                    logger.info(f"Loaded v2 {name} model from {filepath}")
+                except Exception as e:
+                    logger.warning(f"Failed to load v2 {name}: {e}")
+        
+        # Load v2 scaler
+        scaler_v2_path = os.path.join(MODELS_DIR, 'scaler_v2_physics_augmented.pkl')
+        if os.path.exists(scaler_v2_path):
+            try:
+                self.scaler_v2 = joblib.load(scaler_v2_path)
+                logger.info(f"Loaded v2 scaler from {scaler_v2_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load v2 scaler: {e}")
+        
+        # Load v1 models
+        for name, filename in v1_model_files.items():
+            filepath = os.path.join(MODELS_DIR, filename)
+            if os.path.exists(filepath):
+                try:
+                    self.v1_models[name] = joblib.load(filepath)
+                    logger.info(f"Loaded v1 {name} model from {filepath}")
+                except Exception as e:
+                    logger.warning(f"Failed to load v1 {name}: {e}")
+        
+        # Load v1 scaler
+        scaler_v1_path = os.path.join(MODELS_DIR, 'scaler_v1_nasa.pkl')
+        if os.path.exists(scaler_v1_path):
+            try:
+                self.scaler_v1 = joblib.load(scaler_v1_path)
+                logger.info(f"Loaded v1 scaler from {scaler_v1_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load v1 scaler: {e}")
+        
+        logger.info(f"Versioned models loaded - v2: {list(self.v2_models.keys())}, v1: {list(self.v1_models.keys())}")
+    
     def _validate_model_features(self) -> bool:
         """Validate that loaded models have correct feature order.
         

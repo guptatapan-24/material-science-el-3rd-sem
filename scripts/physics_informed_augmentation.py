@@ -421,15 +421,24 @@ class NASADataAugmentor:
                 cycle = row['cycle']
                 
                 # Get corresponding impedance data (Re, Rct)
-                Re = row.get('Re', 0.055 + cycle * 0.0002)
-                Rct = row.get('Rct', 0.18 + cycle * 0.0003)
+                try:
+                    Re = float(row.get('Re', 0.055 + cycle * 0.0002))
+                except (ValueError, TypeError):
+                    Re = 0.055 + cycle * 0.0002
+                try:
+                    Rct = float(row.get('Rct', 0.18 + cycle * 0.0003))
+                except (ValueError, TypeError):
+                    Rct = 0.18 + cycle * 0.0003
                 if pd.isna(Re):
                     Re = 0.055 + cycle * 0.0002
                 if pd.isna(Rct):
                     Rct = 0.18 + cycle * 0.0003
                 
                 # Get temperature
-                temp = row.get('ambient_temperature', 24)
+                try:
+                    temp = float(row.get('ambient_temperature', 24))
+                except (ValueError, TypeError):
+                    temp = 24
                 if pd.isna(temp):
                     temp = 24
                 

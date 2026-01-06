@@ -50,11 +50,19 @@ class CrossDatasetConfidence(str, Enum):
     LOW = "low"        # Weak or no match across datasets
 
 
+class ModelVersion(str, Enum):
+    """Available model versions."""
+    V2_PHYSICS_AUGMENTED = "v2_physics_augmented"
+    V1_NASA_BASELINE = "v1_nasa"
+
+
 class PredictionRequest(BaseModel):
     """Request schema for battery RUL prediction.
     
     All parameters must be within valid operational ranges
     for lithium-ion batteries.
+    
+    Phase 4: Added model_version for selecting between baseline and augmented models.
     """
     voltage: float = Field(
         ...,
@@ -85,6 +93,14 @@ class PredictionRequest(BaseModel):
     model_name: Optional[str] = Field(
         default="XGBoost",
         description="ML model to use for prediction"
+    )
+    model_version: Optional[str] = Field(
+        default="v2_physics_augmented",
+        description="Model version: 'v2_physics_augmented' (default, CALCE-enhanced) or 'v1_nasa' (baseline)"
+    )
+    compare_baseline: Optional[bool] = Field(
+        default=False,
+        description="If true, also return baseline model prediction for comparison"
     )
 
     @field_validator('voltage')

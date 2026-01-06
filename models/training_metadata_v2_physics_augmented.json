@@ -1,0 +1,116 @@
+{
+  "model_version": "v2_physics_augmented",
+  "training_date": "2026-01-06T14:37:02.321539",
+  "training_samples": 11000,
+  "validation_samples": 2750,
+  "features": [
+    "cycle",
+    "cycle_normalized",
+    "voltage_mean",
+    "voltage_std",
+    "voltage_min",
+    "voltage_max",
+    "voltage_range",
+    "voltage_skew",
+    "voltage_kurtosis",
+    "voltage_slope",
+    "current_mean",
+    "current_std",
+    "current_min",
+    "current_max",
+    "current_range",
+    "temp_mean",
+    "temp_std",
+    "temp_min",
+    "temp_max",
+    "temp_range",
+    "temp_rise",
+    "discharge_time",
+    "power_mean",
+    "power_max",
+    "energy",
+    "capacity",
+    "initial_capacity",
+    "capacity_fade",
+    "capacity_ratio",
+    "ambient_temperature",
+    "Re",
+    "Rct",
+    "soh"
+  ],
+  "evaluation_results": {
+    "XGBoost": {
+      "MAE": 5.468142986297607,
+      "RMSE": 10.830125852295646,
+      "R2": 0.9814513325691223
+    },
+    "Random Forest": {
+      "MAE": 7.683373073829237,
+      "RMSE": 15.355887027876438,
+      "R2": 0.9627097244912693
+    },
+    "Linear Regression": {
+      "MAE": 38.95569625909002,
+      "RMSE": 51.0999376750554,
+      "R2": 0.5870604157946401
+    }
+  },
+  "rul_distribution": {
+    "XGBoost": {
+      "actual_range": [
+        0.0,
+        296.0
+      ],
+      "predicted_range": [
+        0.0,
+        283.6148376464844
+      ],
+      "actual_mean": 72.99527272727272,
+      "predicted_mean": 73.15585327148438,
+      "actual_std": 79.53459782508982,
+      "predicted_std": 77.26106262207031,
+      "early_life_samples": 1023,
+      "mid_life_samples": 447,
+      "late_life_samples": 1280
+    },
+    "Random Forest": {
+      "actual_range": [
+        0.0,
+        296.0
+      ],
+      "predicted_range": [
+        0.0,
+        268.3234511067201
+      ],
+      "actual_mean": 72.99527272727272,
+      "predicted_mean": 73.21600910259592,
+      "actual_std": 79.53459782508982,
+      "predicted_std": 75.9774758122148,
+      "early_life_samples": 1023,
+      "mid_life_samples": 447,
+      "late_life_samples": 1280
+    },
+    "Linear Regression": {
+      "actual_range": [
+        0.0,
+        296.0
+      ],
+      "predicted_range": [
+        0.0,
+        256.91739925938964
+      ],
+      "actual_mean": 72.99527272727272,
+      "predicted_mean": 75.85058177512181,
+      "actual_std": 79.53459782508982,
+      "predicted_std": 56.54594625799696,
+      "early_life_samples": 1023,
+      "mid_life_samples": 447,
+      "late_life_samples": 1280
+    }
+  },
+  "data_source": {
+    "primary": "NASA Battery Aging Dataset",
+    "augmentation": "CALCE Physics-Informed Sensitivities",
+    "augmentation_type": "Temperature variations based on CALCE degradation coefficients"
+  }
+}

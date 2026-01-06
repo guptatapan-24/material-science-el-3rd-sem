@@ -187,7 +187,9 @@ def predict_rul_via_api(
     temperature: float,
     cycle: int,
     capacity: float,
-    model_name: str = "XGBoost"
+    model_name: str = "XGBoost",
+    model_version: str = "v2_physics_augmented",
+    compare_baseline: bool = False
 ) -> Dict[str, Any]:
     """
     Make RUL prediction by calling the backend API.
@@ -199,6 +201,8 @@ def predict_rul_via_api(
         cycle: Cycle count
         capacity: Current capacity (Ah)
         model_name: ML model to use
+        model_version: Model version ('v2_physics_augmented' or 'v1_nasa')
+        compare_baseline: If True, include baseline model comparison
         
     Returns:
         dict: Prediction result or error information
@@ -209,7 +213,9 @@ def predict_rul_via_api(
         "temperature": temperature,
         "cycle": cycle,
         "capacity": capacity,
-        "model_name": model_name
+        "model_name": model_name,
+        "model_version": model_version,
+        "compare_baseline": compare_baseline
     }
     
     try:

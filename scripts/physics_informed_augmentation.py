@@ -405,7 +405,7 @@ class NASADataAugmentor:
             if len(valid_caps) == 0:
                 continue
             
-            initial_capacity = valid_caps.iloc[0]
+            initial_capacity = float(valid_caps.iloc[0])
             
             # Calculate cycle number (discharge cycles only)
             battery_df['cycle'] = range(1, len(battery_df) + 1)
@@ -414,7 +414,10 @@ class NASADataAugmentor:
                 if pd.isna(row['Capacity']):
                     continue
                 
-                capacity = row['Capacity']
+                try:
+                    capacity = float(row['Capacity'])
+                except (ValueError, TypeError):
+                    continue
                 cycle = row['cycle']
                 
                 # Get corresponding impedance data (Re, Rct)

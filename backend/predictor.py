@@ -589,7 +589,8 @@ class BatteryPredictor:
         return df[self.feature_names]
     
     def predict(self, voltage: float, current: float, temperature: float,
-                cycle: int, capacity: float, model_name: str = 'XGBoost') -> dict:
+                cycle: int, capacity: float, model_name: str = 'XGBoost',
+                model_version: str = 'v2_physics_augmented') -> dict:
         """Make RUL prediction.
         
         Args:
@@ -598,26 +599,43 @@ class BatteryPredictor:
             temperature: Temperature (°C)
             cycle: Cycle count
             capacity: Current capacity (Ah)
-            model_name: Model to use
+            model_name: Model to use (XGBoost, Random Forest, Linear Regression)
+            model_version: Model version ('v2_physics_augmented' or 'v1_nasa')
             
         Returns:
             Dictionary with prediction results
         """
-        if model_name not in self.models:
-            available = list(self.models.keys())
+        # Select model based on version
+        if model_version == 'v1_nasa':
+            models_dict = self.v1_models if self.v1_models else self.models
+            scaler = self.scaler_v1 if self.scaler_v1 else self.scaler
+            version_used = 'v1_nasa'
+        else:
+            models_dict = self.v2_models if self.v2_models else self.models
+            scaler = self.scaler_v2 if self.scaler_v2 else self.scaler
+            version_used = 'v2_physics_augmented'
+        
+        # Fallback to default models if versioned models not available
+        if not models_dict:
+            models_dict = self.models
+            scaler = self.scaler
+            version_used = self.current_model_version
+        
+        if model_name not in models_dict:
+            available = list(models_dict.keys())
             if not available:
                 raise RuntimeError("No models available")
             model_name = available[0]
             logger.warning(f"Requested model not available, using {model_name}")
         
-        model = self.models[model_name]
+        model = models_dict[model_name]
         
         # Create features
         features = self.create_features(voltage, current, temperature, cycle, capacity)
         
         # Scale features
         features_scaled = pd.DataFrame(
-            self.scaler.transform(features),
+            scaler.transform(features),
             columns=features.columns
         )
         
@@ -631,18 +649,66 @@ class BatteryPredictor:
         # Ensure non-negative
         predicted_rul = max(0, predicted_rul)
         
-        # Health classification
+        # Health classification (updated for Phase 4 with broader RUL range)
         health = self._classify_health(predicted_rul)
         
         # Confidence level
         confidence = self._calculate_confidence(predicted_rul, capacity, cycle)
         
+        # Generate recommendation based on updated Phase 4 RUL ranges
+        recommendation = self._generate_recommendation(predicted_rul)
+        
         return {
             'predicted_rul_cycles': int(round(predicted_rul)),
             'battery_health': health,
             'confidence_level': confidence,
-            'model_used': model_name
+            'model_used': model_name,
+            'model_version': version_used,
+            'recommendation': recommendation
         }
+    
+    def predict_with_baseline_comparison(self, voltage: float, current: float, 
+                                         temperature: float, cycle: int, 
+                                         capacity: float, model_name: str = 'XGBoost') -> dict:
+        """Make predictions with both v2 and v1 models for comparison.
+        
+        Useful for academic validation and showing improvement over baseline.
+        """
+        # Predict with v2 (physics-augmented)
+        v2_result = self.predict(voltage, current, temperature, cycle, capacity, 
+                                 model_name, 'v2_physics_augmented')
+        
+        # Predict with v1 (baseline)
+        v1_result = self.predict(voltage, current, temperature, cycle, capacity, 
+                                 model_name, 'v1_nasa')
+        
+        # Calculate improvement
+        improvement = v2_result['predicted_rul_cycles'] - v1_result['predicted_rul_cycles']
+        
+        return {
+            'v2_prediction': v2_result,
+            'v1_baseline': v1_result,
+            'rul_difference': improvement,
+            'comparison_note': (
+                f"V2 physics-augmented model predicts {abs(improvement)} cycles "
+                f"{'more' if improvement > 0 else 'fewer'} RUL than V1 baseline"
+            )
+        }
+    
+    def _generate_recommendation(self, rul: float) -> str:
+        """Generate maintenance recommendation based on RUL.
+        
+        Phase 4 Updated Ranges (broader due to CALCE-augmented training):
+        - RUL > 800: Early healthy state
+        - 300 <= RUL <= 800: Mid-life
+        - RUL < 300: End-of-life approaching
+        """
+        if rul > 800:
+            return "Battery in early healthy state – no action required"
+        elif 300 <= rul <= 800:
+            return "Battery in mid-life – optimize charging behavior"
+        else:
+            return "Battery approaching end-of-life – plan maintenance or replacement"
     
     def _classify_health(self, rul: float) -> str:
         """Classify battery health based on RUL.

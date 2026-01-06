@@ -783,6 +783,30 @@ class BatteryPredictor:
     def available_models(self) -> list:
         """Get list of available models."""
         return list(self.models.keys())
+    
+    @property
+    def available_model_versions(self) -> list:
+        """Get list of available model versions."""
+        versions = []
+        if self.v2_models:
+            versions.append('v2_physics_augmented')
+        if self.v1_models:
+            versions.append('v1_nasa')
+        if not versions:
+            versions.append(self.current_model_version)
+        return versions
+    
+    def get_model_info(self) -> dict:
+        """Get detailed information about loaded models."""
+        return {
+            'default_models': list(self.models.keys()),
+            'v2_physics_augmented': list(self.v2_models.keys()),
+            'v1_nasa_baseline': list(self.v1_models.keys()),
+            'current_version': self.current_model_version,
+            'available_versions': self.available_model_versions,
+            'has_v2_scaler': self.scaler_v2 is not None,
+            'has_v1_scaler': self.scaler_v1 is not None,
+        }
 
 
 # Global predictor instance (loaded once at module import)

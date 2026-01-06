@@ -209,8 +209,7 @@ async def get_dataset_statistics():
 async def predict_rul(request: PredictionRequest):
     """Predict Remaining Useful Life for a battery.
     
-    Phase 3 Enhanced: Includes distribution validation, life stage context,
-    and confidence explanations.
+    Phase 4 Enhanced: Supports model versioning and baseline comparison.
     
     **Input Parameters:**
     - **voltage**: Battery voltage (2.0V - 4.5V)
@@ -219,15 +218,20 @@ async def predict_rul(request: PredictionRequest):
     - **cycle**: Current charge-discharge cycle count (non-negative)
     - **capacity**: Current battery capacity in Ah (> 0.01)
     - **model_name**: ML model to use (optional, default: XGBoost)
+    - **model_version**: Model version ('v2_physics_augmented' or 'v1_nasa')
+    - **compare_baseline**: If true, include baseline comparison in response
     
     **Response:**
     - **predicted_rul_cycles**: Predicted remaining cycles until 80% capacity
     - **battery_health**: Health classification (Healthy/Moderate/Critical)
     - **confidence_level**: Prediction confidence (High/Medium/Low)
+    - **model_version**: Model version used for prediction
+    - **recommendation**: Maintenance recommendation
     - **distribution_status**: Whether input is in/out of training distribution
     - **life_stage_context**: Inferred battery life stage
     - **confidence_explanation**: Detailed explanation of prediction context
     - **inference_warning**: Warning if input is unusual (optional)
+    - **baseline_comparison**: Comparison with v1 baseline (if requested)
     """
     global predictor
     
@@ -243,17 +247,22 @@ async def predict_rul(request: PredictionRequest):
         )
     
     try:
-        # Make prediction
+        # Make prediction with specified model version
+        model_version = request.model_version or "v2_physics_augmented"
+        
         result = predictor.predict(
             voltage=request.voltage,
             current=request.current,
             temperature=request.temperature,
             cycle=request.cycle,
             capacity=request.capacity,
-            model_name=request.model_name
+            model_name=request.model_name,
+            model_version=model_version
         )
         
         predicted_rul = result['predicted_rul_cycles']
+        model_version_used = result.get('model_version', model_version)
+        recommendation = result.get('recommendation', '')
         
         # Perform distribution validation
         validation = validate_prediction_input(
@@ -275,10 +284,6 @@ async def predict_rul(request: PredictionRequest):
         )
         
         # Determine final confidence based on cross-dataset agreement
-        # Rules:
-        # - High: Closest dataset + at least one additional agrees
-        # - Medium: Strong match with single dataset only
-        # - Low: Weak or no match across datasets
         cross_dataset_conf = cross_dataset_result.get('cross_dataset_confidence', 'medium')
         dominant_dataset = cross_dataset_result.get('dominant_dataset', 'NASA')
         dataset_coverage_note = cross_dataset_result.get('dataset_coverage_note', '')
@@ -297,9 +302,33 @@ async def predict_rul(request: PredictionRequest):
         if dataset_coverage_note:
             enhanced_explanation = f"{enhanced_explanation} {dataset_coverage_note}"
         
+        # Phase 4: Baseline comparison if requested
+        baseline_comparison = None
+        if request.compare_baseline and model_version != 'v1_nasa':
+            baseline_result = predictor.predict(
+                voltage=request.voltage,
+                current=request.current,
+                temperature=request.temperature,
+                cycle=request.cycle,
+                capacity=request.capacity,
+                model_name=request.model_name,
+                model_version='v1_nasa'
+            )
+            improvement = predicted_rul - baseline_result['predicted_rul_cycles']
+            baseline_comparison = {
+                'v1_predicted_rul': baseline_result['predicted_rul_cycles'],
+                'v1_health': baseline_result['battery_health'],
+                'rul_difference': improvement,
+                'comparison_note': (
+                    f"V2 physics-augmented model predicts {abs(improvement)} cycles "
+                    f"{'more' if improvement > 0 else 'fewer'} RUL than V1 baseline"
+                )
+            }
+        
         logger.info(
             f"Prediction made: RUL={predicted_rul} cycles, "
             f"Health={result['battery_health']}, Model={result['model_used']}, "
+            f"Version={model_version_used}, "
             f"Distribution={validation['distribution_status']}, LifeStage={validation['life_stage_context']}, "
             f"DominantDataset={dominant_dataset}, CrossDatasetConf={cross_dataset_conf}"
         )
@@ -309,13 +338,16 @@ async def predict_rul(request: PredictionRequest):
             battery_health=BatteryHealthStatus(result['battery_health']),
             confidence_level=ConfidenceLevel(final_confidence),
             model_used=result['model_used'],
+            model_version=model_version_used,
+            recommendation=recommendation,
             distribution_status=DistributionStatus(validation['distribution_status']),
             life_stage_context=LifeStageContext(validation['life_stage_context']),
             confidence_explanation=enhanced_explanation,
             inference_warning=validation['inference_warning'],
             dominant_dataset=dominant_dataset,
             cross_dataset_confidence=cross_dataset_conf,
-            dataset_coverage_note=dataset_coverage_note
+            dataset_coverage_note=dataset_coverage_note,
+            baseline_comparison=baseline_comparison
         )
         
     except ValueError as e:

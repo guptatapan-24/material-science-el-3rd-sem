@@ -1220,17 +1220,24 @@ def about_page():
     | `/api/predict` | POST | Make RUL prediction |
     | `/api/predict/batch` | POST | Batch CSV prediction |
     | `/api/statistics` | GET | Dataset statistics |
+    | `/api/models` | GET | List available models |
+    | `/api/models/info` | GET | Detailed model information |
     
     ---
     
-    **Version**: 3.5.0 (Phase 3.5 - Multi-Dataset Expansion)  
+    **Version**: 4.0.0 (Phase 4 - Physics-Augmented Model Retraining)  
     **Last Updated**: 2025
     
-    **Phase 3.5 Features:**
-    - Multi-dataset analysis (NASA, CALCE, Oxford, MATR1)
-    - Cross-dataset confidence scoring
-    - Improved early-life battery handling
-    - Dataset coverage explanations
+    **Phase 4 Features:**
+    - Physics-augmented model training (V2) using CALCE sensitivities
+    - NASA baseline model retained (V1) for comparison
+    - Model version selection and comparison
+    - Updated RUL recommendation thresholds
+    - Broader RUL prediction distribution
+    
+    **Previous Phases:**
+    - Phase 3.5: Multi-dataset analysis (NASA, CALCE, Oxford, MATR1)
+    - Phase 3: Dataset compatibility, OOD detection, batch prediction
     """)
 
 

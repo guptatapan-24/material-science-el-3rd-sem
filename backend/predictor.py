@@ -82,6 +82,8 @@ class BatteryPredictor:
         self.scaler_v2: Optional[MinMaxScaler] = None
         self.scaler_v1: Optional[MinMaxScaler] = None
         self.feature_names: list = FEATURE_COLUMNS
+        self.feature_names_v1: list = FEATURE_COLUMNS_V1
+        self.feature_names_v2: list = FEATURE_COLUMNS_V2
         self._models_loaded = False
         
         # Model versions (Phase 4)

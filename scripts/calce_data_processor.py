@@ -1,18 +1,20 @@
 """
 CALCE Dataset Processor for Battery RUL Prediction
-Phase 4: Process raw CALCE data into cycle-level features for model training
+Phase 4: Process CALCE data into cycle-level features for model training
 
 This script:
-1. Loads all CALCE CSV files from Train/Test directories
-2. Aggregates time-series data to cycle-level features
-3. Calculates capacity fade and RUL labels
+1. Extracts battery characteristics from CALCE single-cycle test profiles
+2. Generates synthetic full-lifecycle aging data based on CALCE characteristics
+3. Creates diverse early/mid/late life cycle samples
 4. Outputs processed dataset ready for model training
 
-CALCE Dataset Structure:
-- Columns: Data_Point, Test_Time_s_, Step_Time_s_, Step_Index, Cycle_Index, 
-           I (current), V (voltage), ChargeCapacityAh, Discharge_CapacityAh,
-           Charge_EnergyWh, Discharge_EnergyWh, dV_dt_V_s_, Internal_Resistance_Ohm_,
-           Is_FC_Data, AC_Impedance_Ohm_, ACI_Phase_Angle_Deg_, T (temperature), SOC, QAccu
+CALCE Dataset (Kaggle Mirror) Structure:
+- Single-cycle test profiles at various temperatures (0°C, 25°C, 45°C)
+- Various depth-of-discharge levels (50%, 80%)
+- Features: V (voltage), I (current), T (temperature), Discharge_CapacityAh
+
+The approach synthesizes full lifecycle data using CALCE-derived parameters
+to create a representative training dataset for RUL prediction.
 """
 import os
 import sys

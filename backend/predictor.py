@@ -713,15 +713,20 @@ class BatteryPredictor:
     def _classify_health(self, rul: float) -> str:
         """Classify battery health based on RUL.
         
+        Phase 4 Updated Classification (broader ranges):
+        - Healthy: RUL > 200 cycles (expanded from old threshold)
+        - Moderate: 100-200 cycles
+        - Critical: < 100 cycles
+        
         Args:
             rul: Predicted remaining useful life in cycles
             
         Returns:
             Health classification string
         """
-        if rul > 500:
+        if rul > 200:
             return "Healthy"
-        elif rul >= 200:
+        elif rul >= 100:
             return "Moderate"
         else:
             return "Critical"

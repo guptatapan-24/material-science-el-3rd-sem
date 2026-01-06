@@ -53,6 +53,10 @@ class BatteryPredictor:
     
     Handles model loading at initialization and provides
     prediction functionality independent of Streamlit.
+    
+    Phase 4: Supports versioned models:
+    - v1_nasa: Original NASA-only trained baseline
+    - v2_physics_augmented: CALCE physics-informed augmented model (default)
     """
     
     def __init__(self):
@@ -61,6 +65,11 @@ class BatteryPredictor:
         self.scaler: Optional[MinMaxScaler] = None
         self.feature_names: list = FEATURE_COLUMNS
         self._models_loaded = False
+        
+        # Model versions (Phase 4)
+        self.model_versions: Dict[str, str] = {}
+        self.current_model_version = "v2_physics_augmented"
+        self.baseline_model_version = "v1_nasa"
         
         # Try to load models on initialization
         self._load_models()

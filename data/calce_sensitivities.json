@@ -1,0 +1,35 @@
+{
+  "source": "CALCE single-cycle test profiles",
+  "purpose": "Physics-informed augmentation of NASA aging data",
+  "files_analyzed": 24,
+  "nominal_values": {
+    "voltage_mean": 3.5155030432431325,
+    "voltage_efficiency": 0.9220914279303627,
+    "capacity": 2.0831375000000003,
+    "current_mean": 0.7235360387954843,
+    "temperature": 25.0
+  },
+  "temperature_sensitivity": {
+    "voltage_coeff_per_degC": 0.003,
+    "capacity_cold_penalty_per_degC": 0.004,
+    "capacity_hot_penalty_per_degC": -0.006613750000000018,
+    "reference_temperature": 25.0,
+    "description": "Battery performance sensitivity to temperature deviations from 25\u00b0C"
+  },
+  "dod_sensitivity": {
+    "efficiency_loss_per_percent_dod": 0.000873755635266434,
+    "reference_dod": 50,
+    "description": "Efficiency loss with increased depth of discharge"
+  },
+  "current_sensitivity": {
+    "voltage_drop_per_amp": 0.05,
+    "efficiency_loss_per_amp": 0.02,
+    "reference_current": 0.7235360387954843,
+    "description": "Performance degradation with increased current rate"
+  },
+  "usage_guidance": {
+    "augmentation_method": "Apply sensitivities to NASA data to simulate varied conditions",
+    "primary_data": "NASA aging dataset (RUL ground truth)",
+    "regularization": "Sensitivities constrain prediction variance based on physics"
+  }
+}

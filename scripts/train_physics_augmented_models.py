@@ -193,8 +193,23 @@ class PhysicsAugmentedModelTrainer:
     
     def split_and_scale(self, X: pd.DataFrame, y: pd.Series, test_size: float = 0.2):
         """Split data and create scaler."""
+        # Clean data - remove NaN/inf values
+        X = X.copy()
+        y = y.copy()
+        
+        # Fill NaN values with column medians
+        X = X.fillna(X.median())
+        y = y.fillna(0)
+        
+        # Remove any remaining NaN/inf rows
+        valid_mask = ~(X.isna().any(axis=1) | y.isna() | np.isinf(y))
+        X = X[valid_mask]
+        y = y[valid_mask]
+        
+        logger.info(f"After cleaning: {len(X)} valid samples")
+        
         # Stratified split by RUL range to ensure diverse test set
-        y_binned = pd.cut(y, bins=[0, 30, 100, 300, np.inf], labels=['critical', 'low', 'medium', 'high'])
+        y_binned = pd.cut(y, bins=[-1, 30, 100, 300, np.inf], labels=['critical', 'low', 'medium', 'high'])
         
         self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(
             X, y, test_size=test_size, random_state=42, stratify=y_binned

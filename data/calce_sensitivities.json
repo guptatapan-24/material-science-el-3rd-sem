@@ -3,7 +3,7 @@
   "purpose": "Physics-informed augmentation of NASA aging data",
   "files_analyzed": 24,
   "nominal_values": {
-    "voltage_mean": 3.5155030432431325,
+    "voltage_mean": 3.515503043243132,
     "voltage_efficiency": 0.9220914279303627,
     "capacity": 2.0831375000000003,
     "current_mean": 0.7235360387954843,

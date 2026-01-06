@@ -84,11 +84,26 @@ class BatteryPredictor:
         3. Validate feature order matches FEATURE_COLUMNS
         4. Check for sklearn version compatibility
         5. If invalid, missing, or force retrain, retrain automatically
+        
+        Phase 4: Loads both v1 (baseline) and v2 (physics-augmented) models.
         """
         model_files = {
             'Linear Regression': 'linear_regression.pkl',
             'Random Forest': 'random_forest.pkl',
             'XGBoost': 'xgboost.pkl',
+        }
+        
+        # Phase 4: Versioned model files
+        v2_model_files = {
+            'Linear Regression': 'linear_regression_v2_physics_augmented.pkl',
+            'Random Forest': 'random_forest_v2_physics_augmented.pkl',
+            'XGBoost': 'xgboost_v2_physics_augmented.pkl',
+        }
+        
+        v1_model_files = {
+            'Linear Regression (Baseline)': 'linear_regression_v1_nasa.pkl',
+            'Random Forest (Baseline)': 'random_forest_v1_nasa.pkl',
+            'XGBoost (Baseline)': 'xgboost_v1_nasa.pkl',
         }
         
         logger.info(f"Models directory: {MODELS_DIR}")

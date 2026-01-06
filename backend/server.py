@@ -606,13 +606,65 @@ async def get_batch_template():
 
 @app.get("/api/models")
 async def list_models():
-    """List available ML models."""
+    """List available ML models and versions.
+    
+    Phase 4: Extended to include model versions and detailed info.
+    """
     global predictor
     
     if predictor is None:
-        return {"models": []}
+        return {"models": [], "versions": []}
     
     return {
         "models": predictor.available_models,
-        "default": "XGBoost"
+        "versions": predictor.available_model_versions,
+        "default_model": "XGBoost",
+        "default_version": "v2_physics_augmented",
+        "model_info": predictor.get_model_info()
+    }
+
+
+@app.get("/api/models/info")
+async def get_model_info():
+    """Get detailed model information.
+    
+    Returns information about all loaded models, versions, and training metadata.
+    """
+    global predictor
+    
+    if predictor is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"status": "error", "message": "Predictor not initialized"}
+        )
+    
+    import json
+    from pathlib import Path
+    
+    # Load training metadata if available
+    metadata_path = Path(MODELS_DIR if 'MODELS_DIR' in dir() else '/app/models') / "training_metadata_v2_physics_augmented.json"
+    training_metadata = {}
+    try:
+        # Try to load metadata from predictor's models dir
+        import os
+        models_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
+        metadata_file = os.path.join(models_dir, 'training_metadata_v2_physics_augmented.json')
+        if os.path.exists(metadata_file):
+            with open(metadata_file, 'r') as f:
+                training_metadata = json.load(f)
+    except Exception as e:
+        logger.warning(f"Could not load training metadata: {e}")
+    
+    return {
+        "model_info": predictor.get_model_info(),
+        "training_metadata": training_metadata,
+        "phase": "Phase 4 - Physics-Augmented Model Retraining",
+        "data_sources": {
+            "primary": "NASA Battery Aging Dataset (RUL ground truth)",
+            "augmentation": "CALCE Physics-Informed Sensitivities"
+        },
+        "improvements": {
+            "v2_vs_v1": "V2 uses CALCE-derived temperature/DOD sensitivities to augment NASA data",
+            "expected_benefit": "Broader RUL prediction range with physics-informed regularization"
+        }
     }

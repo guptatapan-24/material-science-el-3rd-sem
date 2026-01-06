@@ -138,6 +138,14 @@ class PredictionRequest(BaseModel):
         if v and v not in valid_models:
             raise ValueError(f'Model must be one of: {valid_models}')
         return v or 'XGBoost'
+    
+    @field_validator('model_version')
+    @classmethod
+    def validate_model_version(cls, v):
+        valid_versions = ['v2_physics_augmented', 'v1_nasa']
+        if v and v not in valid_versions:
+            raise ValueError(f'Model version must be one of: {valid_versions}')
+        return v or 'v2_physics_augmented'
 
     class Config:
         json_schema_extra = {
@@ -147,7 +155,9 @@ class PredictionRequest(BaseModel):
                 "temperature": 25.0,
                 "cycle": 100,
                 "capacity": 1.8,
-                "model_name": "XGBoost"
+                "model_name": "XGBoost",
+                "model_version": "v2_physics_augmented",
+                "compare_baseline": False
             }
         }
 

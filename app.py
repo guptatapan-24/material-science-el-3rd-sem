@@ -729,7 +729,9 @@ def predict_rul_page():
                     temperature=temperature,
                     cycle=cycle_count,
                     capacity=capacity,
-                    model_name=model_choice
+                    model_name=model_choice,
+                    model_version=model_version,
+                    compare_baseline=compare_baseline
                 )
                 
                 if result['success']:
@@ -738,6 +740,8 @@ def predict_rul_page():
                     battery_health = data['battery_health']
                     confidence = data['confidence_level']
                     model_used = data['model_used']
+                    model_version_used = data.get('model_version', model_version)
+                    recommendation = data.get('recommendation', '')
                     
                     # Display results
                     st.success("✅ Prediction Complete!")
@@ -761,7 +765,47 @@ def predict_rul_page():
                         st.markdown(get_confidence_badge(confidence), unsafe_allow_html=True)
                     
                     # Model info footer
-                    st.caption(f"🤖 Model used: {model_used}")
+                    version_label = "Physics-Augmented" if "v2" in model_version_used else "NASA Baseline"
+                    st.caption(f"🤖 Model: {model_used} | 📦 Version: {version_label}")
+                    
+                    # Recommendation
+                    if recommendation:
+                        st.info(f"💡 **Recommendation:** {recommendation}")
+                    
+                    # Phase 4: Baseline comparison display
+                    baseline_comparison = data.get('baseline_comparison')
+                    if baseline_comparison and compare_baseline:
+                        st.markdown("---")
+                        st.markdown("### 📊 Model Version Comparison (Phase 4)")
+                        
+                        comp_col1, comp_col2, comp_col3 = st.columns(3)
+                        
+                        with comp_col1:
+                            st.metric(
+                                "V2 (Physics-Augmented)", 
+                                f"{predicted_rul} cycles",
+                                help="CALCE physics-informed model"
+                            )
+                        
+                        with comp_col2:
+                            v1_rul = baseline_comparison.get('v1_predicted_rul', 0)
+                            st.metric(
+                                "V1 (NASA Baseline)", 
+                                f"{v1_rul} cycles",
+                                help="Original NASA-only trained model"
+                            )
+                        
+                        with comp_col3:
+                            diff = baseline_comparison.get('rul_difference', 0)
+                            diff_color = "normal" if diff >= 0 else "inverse"
+                            st.metric(
+                                "Improvement", 
+                                f"{diff:+d} cycles",
+                                delta=f"{diff:+d}",
+                                delta_color=diff_color
+                            )
+                        
+                        st.info(f"📝 {baseline_comparison.get('comparison_note', '')}")
                     
                     st.markdown("---")
                     

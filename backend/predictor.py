@@ -62,7 +62,11 @@ class BatteryPredictor:
     def __init__(self):
         """Initialize predictor and load models."""
         self.models: Dict[str, Any] = {}
+        self.v2_models: Dict[str, Any] = {}  # Physics-augmented models
+        self.v1_models: Dict[str, Any] = {}  # Baseline NASA-only models
         self.scaler: Optional[MinMaxScaler] = None
+        self.scaler_v2: Optional[MinMaxScaler] = None
+        self.scaler_v1: Optional[MinMaxScaler] = None
         self.feature_names: list = FEATURE_COLUMNS
         self._models_loaded = False
         
@@ -70,9 +74,11 @@ class BatteryPredictor:
         self.model_versions: Dict[str, str] = {}
         self.current_model_version = "v2_physics_augmented"
         self.baseline_model_version = "v1_nasa"
+        self.available_versions = ["v2_physics_augmented", "v1_nasa"]
         
         # Try to load models on initialization
         self._load_models()
+        self._load_versioned_models()
         self._load_or_create_scaler()
     
     def _load_models(self) -> None:

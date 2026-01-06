@@ -127,7 +127,7 @@ class BatteryPredictor:
         # Track if any model had version issues
         version_mismatch = False
         
-        # Try loading existing models
+        # Try loading existing models (default models are v2_physics_augmented)
         for name, filename in model_files.items():
             filepath = os.path.join(MODELS_DIR, filename)
             if os.path.exists(filepath):
@@ -137,6 +137,7 @@ class BatteryPredictor:
                     with warnings.catch_warnings(record=True) as w:
                         warnings.simplefilter("always")
                         self.models[name] = joblib.load(filepath)
+                        self.model_versions[name] = self.current_model_version
                         
                         # Check for version mismatch warnings
                         for warning in w:

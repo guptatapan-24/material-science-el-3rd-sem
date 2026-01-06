@@ -519,7 +519,7 @@ class BatteryPredictor:
         return X, y
     
     def create_features(self, voltage: float, current: float, temperature: float,
-                       cycle: int, capacity: float) -> pd.DataFrame:
+                       cycle: int, capacity: float, version: str = 'v1') -> pd.DataFrame:
         """Create feature vector from user inputs.
         
         Args:
@@ -528,9 +528,10 @@ class BatteryPredictor:
             temperature: Temperature (°C)
             cycle: Cycle count
             capacity: Current capacity (Ah)
+            version: 'v1' for baseline feature order, 'v2' for physics-augmented order
             
         Returns:
-            DataFrame with features matching model input in EXACT FEATURE_COLUMNS order
+            DataFrame with features matching model input in correct order
         """
         initial_capacity = 2.0
         capacity_fade = initial_capacity - capacity
@@ -563,9 +564,10 @@ class BatteryPredictor:
         discharge_time = 3000 * capacity_ratio
         energy = power_mean * discharge_time / 3600
         
-        # Create features in EXACT order of FEATURE_COLUMNS
+        # Create all features as dict
         features = {
             'cycle': cycle,
+            'cycle_normalized': min(cycle / 168.0, 1.0),
             'voltage_mean': voltage,
             'voltage_std': 0.35 + (capacity_fade * 0.1),
             'voltage_min': voltage_min,
@@ -597,12 +599,17 @@ class BatteryPredictor:
             'Re': Re,
             'Rct': Rct,
             'soh': capacity_ratio * 100,
-            'cycle_normalized': min(cycle / 168.0, 1.0),
         }
+        
+        # Select correct feature order based on version
+        if version == 'v2':
+            feature_names = self.feature_names_v2
+        else:
+            feature_names = self.feature_names_v1
         
         # Create DataFrame with explicit column ordering
         df = pd.DataFrame([features])
-        return df[self.feature_names]
+        return df[feature_names]
     
     def predict(self, voltage: float, current: float, temperature: float,
                 cycle: int, capacity: float, model_name: str = 'XGBoost',

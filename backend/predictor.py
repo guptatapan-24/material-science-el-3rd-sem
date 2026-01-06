@@ -36,8 +36,8 @@ DATA_DIR = str(PROJECT_ROOT / "data")
 FORCE_RETRAIN = os.environ.get('FORCE_RETRAIN', 'false').lower() in ('true', '1', 'yes')
 
 # Feature columns expected by the models (must match training)
-# Order matches the trained model's feature_names
-FEATURE_COLUMNS = [
+# V1 (NASA baseline) feature order - cycle_normalized at end
+FEATURE_COLUMNS_V1 = [
     'cycle', 'voltage_mean', 'voltage_std', 'voltage_min', 'voltage_max',
     'voltage_range', 'voltage_skew', 'voltage_kurtosis', 'voltage_slope',
     'current_mean', 'current_std', 'current_min', 'current_max', 'current_range',
@@ -46,6 +46,20 @@ FEATURE_COLUMNS = [
     'initial_capacity', 'capacity_fade', 'capacity_ratio', 'ambient_temperature',
     'Re', 'Rct', 'soh', 'cycle_normalized'
 ]
+
+# V2 (physics-augmented) feature order - cycle_normalized after cycle
+FEATURE_COLUMNS_V2 = [
+    'cycle', 'cycle_normalized', 'voltage_mean', 'voltage_std', 'voltage_min', 'voltage_max',
+    'voltage_range', 'voltage_skew', 'voltage_kurtosis', 'voltage_slope',
+    'current_mean', 'current_std', 'current_min', 'current_max', 'current_range',
+    'temp_mean', 'temp_std', 'temp_min', 'temp_max', 'temp_range', 'temp_rise',
+    'discharge_time', 'power_mean', 'power_max', 'energy', 'capacity',
+    'initial_capacity', 'capacity_fade', 'capacity_ratio', 'ambient_temperature',
+    'Re', 'Rct', 'soh'
+]
+
+# Default to V1 for backward compatibility
+FEATURE_COLUMNS = FEATURE_COLUMNS_V1
 
 
 class BatteryPredictor:

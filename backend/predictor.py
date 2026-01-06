@@ -724,14 +724,14 @@ class BatteryPredictor:
     def _generate_recommendation(self, rul: float) -> str:
         """Generate maintenance recommendation based on RUL.
         
-        Phase 4 Updated Ranges (broader due to CALCE-augmented training):
-        - RUL > 800: Early healthy state
-        - 300 <= RUL <= 800: Mid-life
-        - RUL < 300: End-of-life approaching
+        Phase 4 Updated Ranges (aligned with NASA dataset distribution):
+        - RUL > 150: Early healthy state (based on actual max ~296)
+        - 50 <= RUL <= 150: Mid-life
+        - RUL < 50: End-of-life approaching
         """
-        if rul > 800:
+        if rul > 150:
             return "Battery in early healthy state – no action required"
-        elif 300 <= rul <= 800:
+        elif 50 <= rul <= 150:
             return "Battery in mid-life – optimize charging behavior"
         else:
             return "Battery approaching end-of-life – plan maintenance or replacement"
@@ -739,10 +739,10 @@ class BatteryPredictor:
     def _classify_health(self, rul: float) -> str:
         """Classify battery health based on RUL.
         
-        Phase 4 Updated Classification (broader ranges):
-        - Healthy: RUL > 200 cycles (expanded from old threshold)
-        - Moderate: 100-200 cycles
-        - Critical: < 100 cycles
+        Phase 4 Updated Classification (aligned with NASA dataset):
+        - Healthy: RUL > 100 cycles (significant remaining life)
+        - Moderate: 30-100 cycles (mid-life degradation)
+        - Critical: < 30 cycles (approaching EOL)
         
         Args:
             rul: Predicted remaining useful life in cycles
@@ -750,9 +750,9 @@ class BatteryPredictor:
         Returns:
             Health classification string
         """
-        if rul > 200:
+        if rul > 100:
             return "Healthy"
-        elif rul >= 100:
+        elif rul >= 30:
             return "Moderate"
         else:
             return "Critical"

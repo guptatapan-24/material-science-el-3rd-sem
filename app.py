@@ -841,6 +841,8 @@ def predict_rul_page():
                         'current': current,
                         'capacity': capacity,
                         'model': model_used,
+                        'model_version': model_version_used,
+                        'recommendation': recommendation,
                         'battery_health': battery_health,
                         'confidence': confidence,
                         'distribution_status': data.get('distribution_status', 'unknown'),
@@ -849,7 +851,8 @@ def predict_rul_page():
                         'inference_warning': data.get('inference_warning', ''),
                         'dominant_dataset': data.get('dominant_dataset', 'NASA'),
                         'cross_dataset_confidence': data.get('cross_dataset_confidence', 'medium'),
-                        'dataset_coverage_note': data.get('dataset_coverage_note', '')
+                        'dataset_coverage_note': data.get('dataset_coverage_note', ''),
+                        'baseline_comparison': baseline_comparison
                     }
                     
                     with col1:

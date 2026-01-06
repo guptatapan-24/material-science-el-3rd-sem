@@ -633,16 +633,19 @@ class BatteryPredictor:
             models_dict = self.v1_models if self.v1_models else self.models
             scaler = self.scaler_v1 if self.scaler_v1 else self.scaler
             version_used = 'v1_nasa'
+            feature_version = 'v1'
         else:
             models_dict = self.v2_models if self.v2_models else self.models
             scaler = self.scaler_v2 if self.scaler_v2 else self.scaler
             version_used = 'v2_physics_augmented'
+            feature_version = 'v2'
         
         # Fallback to default models if versioned models not available
         if not models_dict:
             models_dict = self.models
             scaler = self.scaler
             version_used = self.current_model_version
+            feature_version = 'v1'  # Default models use v1 feature order
         
         if model_name not in models_dict:
             available = list(models_dict.keys())
@@ -653,8 +656,8 @@ class BatteryPredictor:
         
         model = models_dict[model_name]
         
-        # Create features
-        features = self.create_features(voltage, current, temperature, cycle, capacity)
+        # Create features with correct order for model version
+        features = self.create_features(voltage, current, temperature, cycle, capacity, feature_version)
         
         # Scale features
         features_scaled = pd.DataFrame(

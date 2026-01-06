@@ -703,6 +703,23 @@ def predict_rul_page():
                 help="Select ML model for prediction"
             )
         
+        # Phase 4: Model version selection
+        st.markdown("### 🔬 Model Version (Phase 4)")
+        col_v1, col_v2 = st.columns(2)
+        with col_v1:
+            model_version = st.selectbox(
+                "📦 Model Version",
+                ["v2_physics_augmented", "v1_nasa"],
+                index=0,
+                help="V2: Physics-augmented (CALCE enhanced). V1: NASA baseline only."
+            )
+        with col_v2:
+            compare_baseline = st.checkbox(
+                "📊 Compare with Baseline",
+                value=True,
+                help="Show comparison between V2 (enhanced) and V1 (baseline) predictions"
+            )
+        
         if st.button("🚀 Predict RUL", use_container_width=True, type="primary"):
             with st.spinner("🔮 Calling prediction API..."):
                 # Call backend API for prediction

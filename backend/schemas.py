@@ -165,7 +165,7 @@ class PredictionRequest(BaseModel):
 class PredictionResponse(BaseModel):
     """Response schema for battery RUL prediction.
     
-    Phase 3.5 Enhanced: Includes multi-dataset analysis and cross-dataset confidence.
+    Phase 4 Enhanced: Includes model version, recommendation, and baseline comparison.
     """
     predicted_rul_cycles: int = Field(
         ...,
@@ -182,6 +182,15 @@ class PredictionResponse(BaseModel):
     model_used: str = Field(
         ...,
         description="ML model used for prediction"
+    )
+    # Phase 4: Model version field
+    model_version: Optional[str] = Field(
+        default="v2_physics_augmented",
+        description="Model version used: 'v2_physics_augmented' or 'v1_nasa'"
+    )
+    recommendation: Optional[str] = Field(
+        default=None,
+        description="Maintenance recommendation based on predicted RUL"
     )
     # Phase 3: Distribution validation fields
     distribution_status: DistributionStatus = Field(
@@ -212,6 +221,11 @@ class PredictionResponse(BaseModel):
     dataset_coverage_note: Optional[str] = Field(
         default=None,
         description="Explanation of which dataset lifecycle patterns the input matches"
+    )
+    # Phase 4: Baseline comparison (optional)
+    baseline_comparison: Optional[dict] = Field(
+        default=None,
+        description="Comparison with v1 baseline model (if compare_baseline=true)"
     )
 
     class Config:

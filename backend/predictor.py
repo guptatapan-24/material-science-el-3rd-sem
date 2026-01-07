@@ -659,11 +659,43 @@ class BatteryPredictor:
         # Create features with correct order for model version
         features = self.create_features(voltage, current, temperature, cycle, capacity, feature_version)
         
-        # Scale features
-        features_scaled = pd.DataFrame(
-            scaler.transform(features),
-            columns=features.columns
-        )
+        # ROBUST: If model has feature_names_in_, reorder features to match
+        if hasattr(model, 'feature_names_in_'):
+            model_features = list(model.feature_names_in_)
+            # Check if all required features exist
+            missing = [f for f in model_features if f not in features.columns]
+            if missing:
+                logger.warning(f"Missing features for model: {missing}")
+            else:
+                # Reorder features to match model's expected order
+                features = features[model_features]
+                logger.debug(f"Reordered features to match model: {model_features[:5]}...")
+        
+        # Scale features - handle potential scaler feature mismatch
+        try:
+            if scaler is not None and hasattr(scaler, 'feature_names_in_'):
+                scaler_features = list(scaler.feature_names_in_)
+                # Reorder for scaler if needed
+                if list(features.columns) != scaler_features:
+                    features_for_scaling = features[scaler_features]
+                else:
+                    features_for_scaling = features
+                features_scaled = pd.DataFrame(
+                    scaler.transform(features_for_scaling),
+                    columns=scaler_features
+                )
+                # Reorder back to model's expected order if different
+                if hasattr(model, 'feature_names_in_'):
+                    model_features = list(model.feature_names_in_)
+                    features_scaled = features_scaled[model_features]
+            else:
+                features_scaled = pd.DataFrame(
+                    scaler.transform(features) if scaler else features.values,
+                    columns=features.columns
+                )
+        except Exception as e:
+            logger.warning(f"Scaler transform issue: {e}, using unscaled features")
+            features_scaled = features
         
         # Predict
         if model_name == 'LSTM':

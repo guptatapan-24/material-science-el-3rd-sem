@@ -1,5 +1,5 @@
 {
-  "evaluation_date": "2026-01-07T19:29:50.370919",
+  "evaluation_date": "2026-01-07T19:56:55.639713",
   "validation_samples": 2769,
   "v1_baseline": {
     "XGBoost": {
@@ -109,8 +109,8 @@
       "actual_std": 85.86784621507195,
       "actual_range": 296.0,
       "lifecycle_errors": {
-        "early_life_mae": 13.816027614079879,
-        "mid_life_mae": 7.6722705174914125,
+        "early_life_mae": 13.81602761407988,
+        "mid_life_mae": 7.672270517491415,
         "late_life_mae": 3.370673147177746
       },
       "sample_counts": {

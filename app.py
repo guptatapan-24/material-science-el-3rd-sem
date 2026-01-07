@@ -1437,10 +1437,10 @@ def evaluation_page():
         if st.button("▶️ Run Model Evaluation", type="primary", use_container_width=True):
             with st.spinner("🔄 Running evaluation... This may take a minute..."):
                 run_result = run_evaluation_via_api()
-                
                 if run_result.get('success'):
                     st.success("✅ Evaluation completed successfully!")
                     st.balloons()
+                    st.session_state.pop("evaluation_cache", None)
                     st.rerun()
                 else:
                     st.error(f"❌ Evaluation failed: {run_result.get('error', 'Unknown error')}")

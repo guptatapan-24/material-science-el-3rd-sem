@@ -687,11 +687,12 @@ async def get_evaluation_results():
     import json
     from pathlib import Path
     
-    output_dir = Path("/app/outputs/evaluation_plots")
-    
-    # Check if evaluation has been run
+    from pathlib import Path
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    output_dir = PROJECT_ROOT / "outputs" / "evaluation_plots"
     metrics_json_path = output_dir / "evaluation_metrics.json"
-    report_path = Path("/app/PHASE_5_EVALUATION_REPORT.md")
+    report_path = PROJECT_ROOT / "PHASE_5_EVALUATION_REPORT.md"
     
     if not metrics_json_path.exists():
         # Evaluation not yet run
@@ -775,7 +776,8 @@ async def run_evaluation():
             )
         
         # Load and return results
-        output_dir = Path("/app/outputs/evaluation_plots")
+        PROJECT_ROOT = Path(__file__).resolve().parents[1]
+        output_dir = PROJECT_ROOT / "outputs" / "evaluation_plots"
         metrics_path = output_dir / "evaluation_metrics.json"
         
         if metrics_path.exists():
@@ -833,7 +835,8 @@ async def get_evaluation_plot(plot_name: str):
     from pathlib import Path
     from fastapi.responses import FileResponse
     
-    plot_path = Path(f"/app/outputs/evaluation_plots/{plot_name}")
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    plot_path = PROJECT_ROOT / "outputs" / "evaluation_plots" / plot_name
     
     if not plot_path.exists():
         raise HTTPException(

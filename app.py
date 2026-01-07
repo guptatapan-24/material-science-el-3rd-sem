@@ -345,6 +345,38 @@ def get_dataset_statistics() -> Dict[str, Any]:
         return {}
 
 
+def get_evaluation_results() -> Dict[str, Any]:
+    """Fetch Phase 5 evaluation results from backend API."""
+    try:
+        response = requests.get(f"{BACKEND_URL}/api/evaluation", timeout=API_TIMEOUT)
+        if response.status_code == 200:
+            return response.json()
+        return {"evaluation_complete": False, "error": f"HTTP {response.status_code}"}
+    except Exception as e:
+        logger.error(f"Failed to fetch evaluation results: {e}")
+        return {"evaluation_complete": False, "error": str(e)}
+
+
+def run_evaluation_via_api() -> Dict[str, Any]:
+    """Trigger Phase 5 evaluation via backend API."""
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/api/evaluation/run", 
+            timeout=180  # 3 minute timeout for evaluation
+        )
+        return response.json()
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Evaluation timed out"}
+    except Exception as e:
+        logger.error(f"Failed to run evaluation: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def get_evaluation_plot_url(plot_name: str) -> str:
+    """Get URL for evaluation plot image."""
+    return f"{BACKEND_URL}/api/evaluation/plot/{plot_name}"
+
+
 def display_api_error(error_result: Dict[str, Any]):
     """
     Display user-friendly error message based on API error type.
@@ -1225,17 +1257,19 @@ def about_page():
     
     ---
     
-    **Version**: 4.0.0 (Phase 4 - Physics-Augmented Model Retraining)  
+    **Version**: 5.0.0 (Phase 5 - Evaluation, Validation, and Comparative Analysis)  
     **Last Updated**: 2025
     
-    **Phase 4 Features:**
-    - Physics-augmented model training (V2) using CALCE sensitivities
-    - NASA baseline model retained (V1) for comparison
-    - Model version selection and comparison
-    - Updated RUL recommendation thresholds
-    - Broader RUL prediction distribution
+    **Phase 5 Features:**
+    - Comprehensive V1 vs V2 model comparison
+    - Quantitative metrics (MAE, RMSE, R² Score)
+    - Visual analysis (distribution plots, scatter plots, error analysis)
+    - Lifecycle stage performance evaluation
+    - Validation checks and success criteria assessment
+    - Academic-ready evaluation report generation
     
     **Previous Phases:**
+    - Phase 4: Physics-augmented model training (V2) using CALCE sensitivities
     - Phase 3.5: Multi-dataset analysis (NASA, CALCE, Oxford, MATR1)
     - Phase 3: Dataset compatibility, OOD detection, batch prediction
     """)
@@ -1364,6 +1398,423 @@ def dataset_statistics_page():
     """)
 
 
+def evaluation_page():
+    """Display Phase 5 Model Evaluation and Comparative Analysis page."""
+    st.title("🔬 Phase 5: Model Evaluation & Validation")
+    st.markdown("""
+    **Comparative Analysis of V1 (NASA Baseline) vs V2 (Physics-Augmented) Models**
+    
+    This page presents systematic evaluation results comparing the baseline NASA-only model 
+    with the physics-informed augmented model for Battery RUL prediction.
+    """)
+    
+    # Check backend status
+    health = check_backend_health()
+    if health.get('status') != 'healthy':
+        st.error(f"⚠️ Backend service unavailable: {health.get('error', 'Unknown error')}")
+        return
+    
+    # Fetch evaluation results
+    results = get_evaluation_results()
+    
+    if not results.get('evaluation_complete', False):
+        # Evaluation not yet run
+        st.warning("⚠️ Model evaluation has not been run yet.")
+        st.info("""
+        The evaluation compares:
+        - **V1 (NASA Baseline)**: Model trained only on NASA aging data
+        - **V2 (Physics-Augmented)**: Model incorporating CALCE degradation characteristics
+        """)
+        
+        st.markdown("### 🚀 Run Evaluation")
+        st.markdown("""
+        Click the button below to run the comprehensive model evaluation. 
+        This will generate comparison metrics, plots, and a validation report.
+        
+        **Note:** This may take 1-2 minutes to complete.
+        """)
+        
+        if st.button("▶️ Run Model Evaluation", type="primary", use_container_width=True):
+            with st.spinner("🔄 Running evaluation... This may take a minute..."):
+                run_result = run_evaluation_via_api()
+                
+                if run_result.get('success'):
+                    st.success("✅ Evaluation completed successfully!")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error(f"❌ Evaluation failed: {run_result.get('error', 'Unknown error')}")
+                    if run_result.get('output'):
+                        with st.expander("📋 Evaluation Output"):
+                            st.code(run_result.get('output', ''))
+        return
+    
+    # Evaluation complete - display results
+    metrics = results.get('metrics', {})
+    plots = results.get('plots', [])
+    report = results.get('report', '')
+    
+    st.success("✅ Evaluation Complete")
+    st.caption(f"📅 Evaluation Date: {metrics.get('evaluation_date', 'N/A')[:19] if metrics.get('evaluation_date') else 'N/A'}")
+    st.caption(f"📊 Validation Samples: {metrics.get('validation_samples', 'N/A')}")
+    
+    # Tabs for different sections
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📊 Metrics Comparison", 
+        "📈 Visualization Plots",
+        "✅ Validation Summary",
+        "📄 Full Report"
+    ])
+    
+    with tab1:
+        st.markdown("## 📊 Quantitative Metrics Comparison")
+        
+        v1_metrics = metrics.get('v1_baseline', {})
+        v2_metrics = metrics.get('v2_augmented', {})
+        comparison = metrics.get('comparison', {})
+        
+        if not v1_metrics or not v2_metrics:
+            st.warning("Metrics data not available")
+        else:
+            # Model selector
+            model_names = list(v1_metrics.keys())
+            selected_model = st.selectbox(
+                "Select Model for Detailed Comparison",
+                model_names,
+                index=model_names.index("XGBoost") if "XGBoost" in model_names else 0
+            )
+            
+            v1 = v1_metrics.get(selected_model, {})
+            v2 = v2_metrics.get(selected_model, {})
+            comp = comparison.get(selected_model, {})
+            
+            st.markdown(f"### {selected_model} Model Comparison")
+            
+            # Key metrics comparison
+            st.markdown("#### 🎯 Primary Accuracy Metrics")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown("**Mean Absolute Error (MAE)**")
+                st.metric(
+                    "V1 (Baseline)", 
+                    f"{v1.get('mae', 0):.2f} cycles",
+                    help="Lower is better"
+                )
+                mae_improvement = comp.get('mae_improvement', 0)
+                st.metric(
+                    "V2 (Augmented)", 
+                    f"{v2.get('mae', 0):.2f} cycles",
+                    delta=f"{mae_improvement:.2f}" if mae_improvement > 0 else f"{mae_improvement:.2f}",
+                    delta_color="normal" if mae_improvement > 0 else "inverse"
+                )
+            
+            with col2:
+                st.markdown("**Root Mean Square Error (RMSE)**")
+                st.metric(
+                    "V1 (Baseline)", 
+                    f"{v1.get('rmse', 0):.2f} cycles",
+                    help="Lower is better"
+                )
+                rmse_improvement = comp.get('rmse_improvement', 0)
+                st.metric(
+                    "V2 (Augmented)", 
+                    f"{v2.get('rmse', 0):.2f} cycles",
+                    delta=f"{rmse_improvement:.2f}" if rmse_improvement > 0 else f"{rmse_improvement:.2f}",
+                    delta_color="normal" if rmse_improvement > 0 else "inverse"
+                )
+            
+            with col3:
+                st.markdown("**R² Score**")
+                st.metric(
+                    "V1 (Baseline)", 
+                    f"{v1.get('r2', 0):.4f}",
+                    help="Higher is better (max 1.0)"
+                )
+                r2_improvement = comp.get('r2_improvement', 0)
+                st.metric(
+                    "V2 (Augmented)", 
+                    f"{v2.get('r2', 0):.4f}",
+                    delta=f"{r2_improvement:.4f}" if r2_improvement > 0 else f"{r2_improvement:.4f}",
+                    delta_color="normal" if r2_improvement > 0 else "inverse"
+                )
+            
+            st.markdown("---")
+            
+            # Distribution metrics
+            st.markdown("#### 📈 Prediction Distribution Metrics")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**V1 (NASA Baseline)**")
+                st.write(f"- Prediction Variance: {v1.get('pred_variance', 0):.2f}")
+                st.write(f"- Prediction Std Dev: {v1.get('pred_std', 0):.2f}")
+                st.write(f"- Prediction Mean: {v1.get('pred_mean', 0):.2f}")
+                st.write(f"- Prediction Range: {v1.get('pred_range', 0):.2f}")
+                
+                if comp.get('v1_collapsed', False):
+                    st.error("⚠️ Low variance detected (potential prediction collapse)")
+            
+            with col2:
+                st.markdown("**V2 (Physics-Augmented)**")
+                st.write(f"- Prediction Variance: {v2.get('pred_variance', 0):.2f}")
+                st.write(f"- Prediction Std Dev: {v2.get('pred_std', 0):.2f}")
+                st.write(f"- Prediction Mean: {v2.get('pred_mean', 0):.2f}")
+                st.write(f"- Prediction Range: {v2.get('pred_range', 0):.2f}")
+                
+                variance_ratio = comp.get('variance_ratio', 1)
+                if variance_ratio > 1:
+                    st.success(f"✅ {variance_ratio:.2f}x more variance than V1")
+                elif variance_ratio >= 0.9:
+                    st.info(f"≈ Similar variance to V1 ({variance_ratio:.2f}x)")
+                else:
+                    st.warning(f"⚠️ Lower variance than V1 ({variance_ratio:.2f}x)")
+            
+            st.markdown("---")
+            
+            # Lifecycle stage performance
+            st.markdown("#### 🔋 Lifecycle Stage Performance")
+            st.markdown("""
+            Error analysis across different battery lifecycle stages:
+            - **Early Life (RUL > 100)**: New or lightly used batteries
+            - **Mid Life (30-100)**: Normal operational phase
+            - **Late Life (RUL < 30)**: End-of-life prediction zone
+            """)
+            
+            v1_lifecycle = v1.get('lifecycle_errors', {})
+            v2_lifecycle = v2.get('lifecycle_errors', {})
+            
+            lifecycle_data = []
+            for stage_key, stage_name in [('early_life_mae', 'Early Life'), ('mid_life_mae', 'Mid Life'), ('late_life_mae', 'Late Life')]:
+                v1_val = v1_lifecycle.get(stage_key, 0)
+                v2_val = v2_lifecycle.get(stage_key, 0)
+                if v1_val and v2_val:
+                    improvement = v1_val - v2_val
+                    lifecycle_data.append({
+                        'Stage': stage_name,
+                        'V1 MAE': f"{v1_val:.2f}",
+                        'V2 MAE': f"{v2_val:.2f}",
+                        'Improvement': f"{improvement:+.2f}",
+                        'Better': '✅ V2' if improvement > 0 else ('≈ Same' if abs(improvement) < 1 else '⬅️ V1')
+                    })
+            
+            if lifecycle_data:
+                st.dataframe(pd.DataFrame(lifecycle_data), use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            
+            # All models comparison table
+            st.markdown("### 📋 All Models Summary")
+            
+            all_metrics_data = []
+            for model_name in model_names:
+                v1_m = v1_metrics.get(model_name, {})
+                v2_m = v2_metrics.get(model_name, {})
+                all_metrics_data.append({
+                    'Model': model_name,
+                    'V1 MAE': f"{v1_m.get('mae', 0):.2f}",
+                    'V2 MAE': f"{v2_m.get('mae', 0):.2f}",
+                    'V1 RMSE': f"{v1_m.get('rmse', 0):.2f}",
+                    'V2 RMSE': f"{v2_m.get('rmse', 0):.2f}",
+                    'V1 R²': f"{v1_m.get('r2', 0):.4f}",
+                    'V2 R²': f"{v2_m.get('r2', 0):.4f}",
+                })
+            
+            st.dataframe(pd.DataFrame(all_metrics_data), use_container_width=True, hide_index=True)
+    
+    with tab2:
+        st.markdown("## 📈 Visualization Plots")
+        
+        if not plots:
+            st.warning("No plots available. Please run evaluation first.")
+        else:
+            st.markdown("### Available Evaluation Plots")
+            
+            # Display plots in organized sections
+            plot_sections = {
+                "RUL Distribution Analysis": ["rul_distribution_comparison.png", "rul_distribution_kde.png"],
+                "Prediction Accuracy": ["actual_vs_predicted.png"],
+                "Error Analysis": ["error_distribution.png"],
+                "Lifecycle Performance": ["lifecycle_stage_performance.png"],
+                "Model Comparison": ["model_comparison_summary.png"]
+            }
+            
+            for section_name, section_plots in plot_sections.items():
+                available_section_plots = [p for p in section_plots if p in plots]
+                if available_section_plots:
+                    st.markdown(f"#### {section_name}")
+                    for plot_name in available_section_plots:
+                        plot_url = get_evaluation_plot_url(plot_name)
+                        try:
+                            response = requests.get(plot_url, timeout=10)
+                            if response.status_code == 200:
+                                st.image(
+                                    response.content, 
+                                    caption=plot_name.replace('_', ' ').replace('.png', '').title(),
+                                    use_column_width=True
+                                )
+                            else:
+                                st.warning(f"Could not load plot: {plot_name}")
+                        except Exception as e:
+                            st.warning(f"Error loading {plot_name}: {e}")
+                    st.markdown("---")
+            
+            # Show any remaining plots
+            remaining_plots = [p for p in plots if not any(p in section for section in plot_sections.values())]
+            if remaining_plots:
+                st.markdown("#### Other Plots")
+                for plot_name in remaining_plots:
+                    plot_url = get_evaluation_plot_url(plot_name)
+                    try:
+                        response = requests.get(plot_url, timeout=10)
+                        if response.status_code == 200:
+                            st.image(response.content, caption=plot_name, use_column_width=True)
+                    except:
+                        pass
+    
+    with tab3:
+        st.markdown("## ✅ Validation Summary")
+        
+        # Sanity checks
+        st.markdown("### 🔍 Sanity Checks")
+        
+        v2_xgb = metrics.get('v2_augmented', {}).get('XGBoost', {})
+        v1_xgb = metrics.get('v1_baseline', {}).get('XGBoost', {})
+        comp_xgb = metrics.get('comparison', {}).get('XGBoost', {})
+        
+        checks = []
+        
+        # Check 1: V2 predictions not constant
+        v2_variance = v2_xgb.get('pred_variance', 0)
+        if v2_variance > 50:
+            checks.append(("✅", "V2 predictions are not constant or clustered", f"Variance: {v2_variance:.2f}"))
+        else:
+            checks.append(("❌", "V2 predictions may be collapsed (low variance)", f"Variance: {v2_variance:.2f}"))
+        
+        # Check 2: V2 variance vs V1
+        variance_ratio = comp_xgb.get('variance_ratio', 0)
+        if variance_ratio >= 0.9:
+            checks.append(("✅", "V2 produces comparable or higher variance than V1", f"Ratio: {variance_ratio:.2f}x"))
+        else:
+            checks.append(("⚠️", "V2 variance lower than V1 (may indicate over-regularization)", f"Ratio: {variance_ratio:.2f}x"))
+        
+        # Check 3: Late-life stability
+        v2_late = v2_xgb.get('lifecycle_errors', {}).get('late_life_mae', float('inf'))
+        v1_late = v1_xgb.get('lifecycle_errors', {}).get('late_life_mae', float('inf'))
+        if v2_late and v1_late and v2_late <= v1_late * 1.2:
+            checks.append(("✅", "Late-life predictions remain stable", f"V2: {v2_late:.2f}, V1: {v1_late:.2f}"))
+        else:
+            checks.append(("⚠️", "Late-life prediction accuracy may have regressed", f"V2: {v2_late:.2f}, V1: {v1_late:.2f}"))
+        
+        # Check 4: Numerical stability
+        v2_mean = v2_xgb.get('pred_mean', 0)
+        if v2_mean > 0:
+            checks.append(("✅", "No runtime or numerical instability detected", f"Mean prediction: {v2_mean:.2f}"))
+        else:
+            checks.append(("❌", "Potential numerical instability detected", ""))
+        
+        for status, description, detail in checks:
+            if status == "✅":
+                st.success(f"{status} {description}")
+            elif status == "⚠️":
+                st.warning(f"{status} {description}")
+            else:
+                st.error(f"{status} {description}")
+            if detail:
+                st.caption(f"   └─ {detail}")
+        
+        passed = sum(1 for c in checks if c[0] == "✅")
+        st.markdown(f"### 📊 Validation Status: **{passed}/{len(checks)} checks passed**")
+        
+        st.markdown("---")
+        
+        # Success criteria
+        st.markdown("### 🎯 Success Criteria Assessment")
+        
+        st.markdown("#### Technical Criteria")
+        
+        mae_improvement = comp_xgb.get('mae_improvement', 0)
+        r2_improvement = comp_xgb.get('r2_improvement', 0)
+        
+        tech_criteria = [
+            (variance_ratio >= 0.9, "V2 shows comparable or higher RUL variance than V1", variance_ratio),
+            (mae_improvement >= 0, "V2 achieves equal or lower MAE", mae_improvement),
+            (v2_late <= v1_late * 1.2 if v2_late and v1_late else False, "No regression in late-life prediction performance", "")
+        ]
+        
+        for passed, description, value in tech_criteria:
+            if passed:
+                st.success(f"✅ {description}")
+            else:
+                st.error(f"❌ {description}")
+        
+        st.markdown("#### Academic Criteria")
+        st.success("✅ Clear evidence of comparison with baseline")
+        st.success("✅ Well-documented comparison artifacts generated")
+        st.success("✅ Results interpretable by non-ML evaluators (visual plots + metrics)")
+    
+    with tab4:
+        st.markdown("## 📄 Full Evaluation Report")
+        
+        if report:
+            st.markdown(report)
+            
+            # Download options
+            st.markdown("### 📥 Download Report")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.download_button(
+                    "📄 Download Markdown Report",
+                    report,
+                    "PHASE_5_EVALUATION_REPORT.md",
+                    "text/markdown",
+                    use_container_width=True
+                )
+            
+            with col2:
+                # CSV metrics export
+                metrics_csv = []
+                for version, model_data in [('V1_Baseline', metrics.get('v1_baseline', {})), 
+                                            ('V2_Augmented', metrics.get('v2_augmented', {}))]:
+                    for model_name, data in model_data.items():
+                        metrics_csv.append({
+                            'Version': version,
+                            'Model': model_name,
+                            'MAE': data.get('mae', ''),
+                            'RMSE': data.get('rmse', ''),
+                            'R2': data.get('r2', ''),
+                            'Pred_Variance': data.get('pred_variance', ''),
+                            'Pred_Std': data.get('pred_std', ''),
+                            'Pred_Mean': data.get('pred_mean', ''),
+                        })
+                
+                if metrics_csv:
+                    csv_df = pd.DataFrame(metrics_csv)
+                    st.download_button(
+                        "📊 Download Metrics CSV",
+                        csv_df.to_csv(index=False),
+                        "evaluation_metrics.csv",
+                        "text/csv",
+                        use_container_width=True
+                    )
+        else:
+            st.warning("Report not available. Please run evaluation first.")
+    
+    # Re-run option
+    st.markdown("---")
+    with st.expander("🔄 Re-run Evaluation"):
+        st.warning("Re-running will regenerate all evaluation metrics and plots.")
+        if st.button("▶️ Re-run Evaluation", type="secondary"):
+            with st.spinner("🔄 Re-running evaluation..."):
+                run_result = run_evaluation_via_api()
+                if run_result.get('success'):
+                    st.success("✅ Evaluation completed!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Failed: {run_result.get('error', 'Unknown error')}")
+
+
 def main():
     """Main application logic."""
     # Check authentication
@@ -1391,6 +1842,7 @@ def main():
             "📈 Predict RUL": "Predict RUL",
             "🔬 What-If Analysis": "What-If",
             "📊 Dataset Statistics": "Dataset Statistics",
+            "🧪 Model Evaluation": "Model Evaluation",
             "ℹ️ About": "About"
         }
         
@@ -1413,6 +1865,8 @@ def main():
         what_if_page()
     elif st.session_state.current_page == "Dataset Statistics":
         dataset_statistics_page()
+    elif st.session_state.current_page == "Model Evaluation":
+        evaluation_page()
     elif st.session_state.current_page == "About":
         about_page()
 

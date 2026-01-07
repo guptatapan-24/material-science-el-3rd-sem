@@ -668,3 +668,176 @@ async def get_model_info():
             "expected_benefit": "Broader RUL prediction range with physics-informed regularization"
         }
     }
+
+
+@app.get("/api/evaluation")
+async def get_evaluation_results():
+    """
+    Get Phase 5 model evaluation results.
+    
+    Returns comparative analysis between V1 (NASA baseline) and V2 (physics-augmented) models
+    including metrics, plots, and validation summary.
+    """
+    import json
+    from pathlib import Path
+    
+    output_dir = Path("/app/outputs/evaluation_plots")
+    
+    # Check if evaluation has been run
+    metrics_json_path = output_dir / "evaluation_metrics.json"
+    report_path = Path("/app/PHASE_5_EVALUATION_REPORT.md")
+    
+    if not metrics_json_path.exists():
+        # Evaluation not yet run
+        return JSONResponse(
+            status_code=200,
+            content={
+                "evaluation_complete": False,
+                "message": "Evaluation has not been run yet. Please run the evaluation script first.",
+                "run_command": "python /app/scripts/evaluate_models.py"
+            }
+        )
+    
+    try:
+        # Load metrics
+        with open(metrics_json_path, 'r') as f:
+            metrics = json.load(f)
+        
+        # Load report if exists
+        report_content = ""
+        if report_path.exists():
+            with open(report_path, 'r') as f:
+                report_content = f.read()
+        
+        # Get available plots
+        plot_files = []
+        if output_dir.exists():
+            for f in output_dir.iterdir():
+                if f.suffix == '.png':
+                    plot_files.append(f.name)
+        
+        return {
+            "evaluation_complete": True,
+            "metrics": metrics,
+            "report": report_content,
+            "plots": plot_files,
+            "output_directory": str(output_dir)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error loading evaluation results: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"status": "error", "message": f"Failed to load evaluation results: {str(e)}"}
+        )
+
+
+@app.post("/api/evaluation/run")
+async def run_evaluation():
+    """
+    Trigger Phase 5 model evaluation.
+    
+    Runs the evaluation script to compare V1 and V2 models.
+    Returns status and results summary.
+    """
+    import subprocess
+    from pathlib import Path
+    
+    try:
+        # Run the evaluation script
+        result = subprocess.run(
+            ["python", "/app/scripts/evaluate_models.py"],
+            capture_output=True,
+            text=True,
+            timeout=120  # 2 minute timeout
+        )
+        
+        if result.returncode != 0:
+            logger.error(f"Evaluation script failed: {result.stderr}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": result.stderr,
+                    "output": result.stdout
+                }
+            )
+        
+        # Load and return results
+        output_dir = Path("/app/outputs/evaluation_plots")
+        metrics_path = output_dir / "evaluation_metrics.json"
+        
+        if metrics_path.exists():
+            import json
+            with open(metrics_path, 'r') as f:
+                metrics = json.load(f)
+            
+            return {
+                "success": True,
+                "message": "Evaluation completed successfully",
+                "output": result.stdout[-1000:] if len(result.stdout) > 1000 else result.stdout,  # Last 1000 chars
+                "metrics_summary": {
+                    "evaluation_date": metrics.get("evaluation_date"),
+                    "validation_samples": metrics.get("validation_samples"),
+                    "models_evaluated": list(metrics.get("v1_baseline", {}).keys())
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "message": "Evaluation completed but metrics file not found",
+                "output": result.stdout
+            }
+            
+    except subprocess.TimeoutExpired:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": "Evaluation timed out after 2 minutes"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error running evaluation: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
+        )
+
+
+@app.get("/api/evaluation/plot/{plot_name}")
+async def get_evaluation_plot(plot_name: str):
+    """
+    Get a specific evaluation plot image.
+    
+    Args:
+        plot_name: Name of the plot file (e.g., 'rul_distribution_comparison.png')
+    
+    Returns:
+        PNG image file
+    """
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    
+    plot_path = Path(f"/app/outputs/evaluation_plots/{plot_name}")
+    
+    if not plot_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail={"status": "error", "message": f"Plot '{plot_name}' not found"}
+        )
+    
+    if not plot_name.endswith('.png'):
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": "Only PNG files are supported"}
+        )
+    
+    return FileResponse(
+        path=str(plot_path),
+        media_type="image/png",
+        filename=plot_name
+    )

@@ -1,0 +1,172 @@
+{
+  "evaluation_date": "2026-01-07T19:29:50.370919",
+  "validation_samples": 2769,
+  "v1_baseline": {
+    "XGBoost": {
+      "model_name": "V1_XGBoost",
+      "mae": 66.6997299194336,
+      "rmse": 99.04834776669675,
+      "r2": -0.33055639266967773,
+      "pred_variance": 150.6922607421875,
+      "pred_std": 12.275677680969238,
+      "pred_mean": 18.46571922302246,
+      "pred_range": 28.28013801574707,
+      "actual_mean": 79.0343084145901,
+      "actual_std": 85.86784621507195,
+      "actual_range": 296.0,
+      "lifecycle_errors": {
+        "early_life_mae": 142.19215393066406,
+        "mid_life_mae": 36.58033752441406,
+        "late_life_mae": 7.668715476989746
+      },
+      "sample_counts": {
+        "early_life": 1139,
+        "mid_life": 354,
+        "late_life": 1276
+      }
+    },
+    "Random Forest": {
+      "model_name": "V1_Random Forest",
+      "mae": 67.04329360780063,
+      "rmse": 99.87804958269601,
+      "r2": -0.35294133675019723,
+      "pred_variance": 143.0108065180184,
+      "pred_std": 11.95871257778271,
+      "pred_mean": 16.388985193210548,
+      "pred_range": 38.05,
+      "actual_mean": 79.0343084145901,
+      "actual_std": 85.86784621507195,
+      "actual_range": 296.0,
+      "lifecycle_errors": {
+        "early_life_mae": 143.5221158911326,
+        "mid_life_mae": 40.343474576271184,
+        "late_life_mae": 6.18307210031348
+      },
+      "sample_counts": {
+        "early_life": 1139,
+        "mid_life": 354,
+        "late_life": 1276
+      }
+    },
+    "Linear Regression": {
+      "model_name": "V1_Linear Regression",
+      "mae": 79.0343084145901,
+      "rmse": 116.70350860273136,
+      "r2": -0.8471692333470986,
+      "pred_variance": 0.0,
+      "pred_std": 0.0,
+      "pred_mean": 0.0,
+      "pred_range": 0.0,
+      "actual_mean": 79.0343084145901,
+      "actual_std": 85.86784621507195,
+      "actual_range": 296.0,
+      "lifecycle_errors": {
+        "early_life_mae": 169.84021071115012,
+        "mid_life_mae": 60.717514124293785,
+        "late_life_mae": 3.0595611285266457
+      },
+      "sample_counts": {
+        "early_life": 1139,
+        "mid_life": 354,
+        "late_life": 1276
+      }
+    }
+  },
+  "v2_augmented": {
+    "XGBoost": {
+      "model_name": "V2_XGBoost",
+      "mae": 5.059333324432373,
+      "rmse": 9.99302353690712,
+      "r2": 0.9864564538002014,
+      "pred_variance": 6883.1708984375,
+      "pred_std": 82.96487426757812,
+      "pred_mean": 77.61189270019531,
+      "pred_range": 290.6328125,
+      "actual_mean": 79.0343084145901,
+      "actual_std": 85.86784621507195,
+      "actual_range": 296.0,
+      "lifecycle_errors": {
+        "early_life_mae": 6.8770318031311035,
+        "mid_life_mae": 7.417701721191406,
+        "late_life_mae": 2.782514810562134
+      },
+      "sample_counts": {
+        "early_life": 1139,
+        "mid_life": 354,
+        "late_life": 1276
+      }
+    },
+    "Random Forest": {
+      "model_name": "V2_Random Forest",
+      "mae": 8.217196876644184,
+      "rmse": 15.531823319122962,
+      "r2": 0.9672822263434216,
+      "pred_variance": 6205.130793139759,
+      "pred_std": 78.77265257143344,
+      "pred_mean": 74.62693937584459,
+      "pred_range": 270.88322684163956,
+      "actual_mean": 79.0343084145901,
+      "actual_std": 85.86784621507195,
+      "actual_range": 296.0,
+      "lifecycle_errors": {
+        "early_life_mae": 13.816027614079879,
+        "mid_life_mae": 7.6722705174914125,
+        "late_life_mae": 3.370673147177746
+      },
+      "sample_counts": {
+        "early_life": 1139,
+        "mid_life": 354,
+        "late_life": 1276
+      }
+    },
+    "Linear Regression": {
+      "model_name": "V2_Linear Regression",
+      "mae": 40.92361743873006,
+      "rmse": 56.36954108314877,
+      "r2": 0.5690490338898658,
+      "pred_variance": 2961.780388756802,
+      "pred_std": 54.4222416733894,
+      "pred_mean": 65.1709725065807,
+      "pred_range": 235.37863666371152,
+      "actual_mean": 79.0343084145901,
+      "actual_std": 85.86784621507195,
+      "actual_range": 296.0,
+      "lifecycle_errors": {
+        "early_life_mae": 66.79914325470479,
+        "mid_life_mae": 19.425832952618997,
+        "late_life_mae": 23.790382175162758
+      },
+      "sample_counts": {
+        "early_life": 1139,
+        "mid_life": 354,
+        "late_life": 1276
+      }
+    }
+  },
+  "comparison": {
+    "XGBoost": {
+      "mae_improvement": 61.64039659500122,
+      "rmse_improvement": 89.05532422978963,
+      "r2_improvement": 1.3170128464698792,
+      "variance_ratio": 45.67700334799279,
+      "v1_collapsed": false,
+      "v2_collapsed": false
+    },
+    "Random Forest": {
+      "mae_improvement": 58.826096731156454,
+      "rmse_improvement": 84.34622626357304,
+      "r2_improvement": 1.3202235630936188,
+      "variance_ratio": 43.38924410133967,
+      "v1_collapsed": false,
+      "v2_collapsed": false
+    },
+    "Linear Regression": {
+      "mae_improvement": 38.11069097586004,
+      "rmse_improvement": 60.33396751958259,
+      "r2_improvement": 1.4162182672369643,
+      "variance_ratio": 0,
+      "v1_collapsed": true,
+      "v2_collapsed": false
+    }
+  }
+}

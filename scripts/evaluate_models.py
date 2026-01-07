@@ -21,9 +21,9 @@ from datetime import datetime
 from typing import Dict, Tuple, List, Optional
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
-import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
+import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 
@@ -874,13 +874,13 @@ class ModelEvaluator:
         # Save report
         report_text = "\n".join(report)
         report_path = OUTPUT_DIR / 'EVALUATION_SUMMARY_REPORT.md'
-        with open(report_path, 'w') as f:
+        with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report_text)
         logger.info(f"Summary report saved to {report_path}")
         
         # Also save to project root
         root_report_path = PROJECT_ROOT / 'PHASE_5_EVALUATION_REPORT.md'
-        with open(root_report_path, 'w') as f:
+        with open(root_report_path, 'w', encoding='utf-8') as f:
             f.write(report_text)
         logger.info(f"Summary report also saved to {root_report_path}")
         

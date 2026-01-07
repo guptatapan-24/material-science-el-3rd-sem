@@ -4,6 +4,12 @@ Provides REST API endpoints for battery life prediction
 
 Phase 3: Enhanced with distribution validation and batch prediction
 """
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 from fastapi import FastAPI, HTTPException, status, File, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +21,7 @@ import io
 import pandas as pd
 
 # Import schemas and predictor
-from schemas import (
+from .schemas import (
     PredictionRequest, 
     PredictionResponse, 
     ErrorResponse, 
@@ -28,10 +34,10 @@ from schemas import (
     BatchPredictionRow,
     DatasetStatisticsResponse
 )
-from predictor import get_predictor, BatteryPredictor
-from distribution_validator import validate_prediction_input, get_validator
-from dataset_statistics import get_statistics_generator
-from multi_dataset_statistics import (
+from .predictor import get_predictor, BatteryPredictor
+from .distribution_validator import validate_prediction_input, get_validator
+from .dataset_statistics import get_statistics_generator
+from .multi_dataset_statistics import (
     get_multi_dataset_manager,
     analyze_input_cross_dataset
 )
@@ -694,7 +700,7 @@ async def get_evaluation_results():
             content={
                 "evaluation_complete": False,
                 "message": "Evaluation has not been run yet. Please run the evaluation script first.",
-                "run_command": "python /app/scripts/evaluate_models.py"
+                "run_command": "python /material-science-el-3rd-sem/scripts/evaluate_models.py"
             }
         )
     
@@ -745,11 +751,16 @@ async def run_evaluation():
     
     try:
         # Run the evaluation script
+        script_path = (
+            Path(__file__).resolve()
+            .parents[1] / "scripts" / "evaluate_models.py"
+        )
+
         result = subprocess.run(
-            ["python", "/app/scripts/evaluate_models.py"],
+            [sys.executable, str(script_path)],
             capture_output=True,
             text=True,
-            timeout=120  # 2 minute timeout
+            timeout=120
         )
         
         if result.returncode != 0:

@@ -9,8 +9,8 @@ from typing import Dict, Any, Optional, List, Tuple
 from enum import Enum
 from dataclasses import dataclass
 
-from dataset_statistics import get_statistics_generator
-from multi_dataset_statistics import (
+from .dataset_statistics import get_statistics_generator
+from .multi_dataset_statistics import (
     get_multi_dataset_manager,
     analyze_input_cross_dataset,
     DatasetSource,
